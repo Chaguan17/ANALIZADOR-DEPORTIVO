@@ -33,3 +33,35 @@
 2. Sesión siguiente — **Fase 2 (Ingesta):** cliente de API con límite de 10 req/min,
    endpoints de partidos/clasificación/goleadores, JSON crudo en `pipeline/raw/`.
 3. Después — **Fase 3:** esquema de tablas Postgres + migraciones con Alembic.
+
+---
+
+## Sesión 2 · 2026-10-22 · API key verificada + gobernanza actualizada
+
+**Qué se hizo:**
+- Propietario registrándose en football-data.org y compartió su API token.
+- Creado `.env` local con `FOOTBALL_API_KEY` (protegido por `.gitignore`; el `.env.example`
+  sirve como plantilla). El `.env` NUNCA se commitea — verificado al hacer `git status`.
+- Petición de prueba contra `https://api.football-data.org/v4/competitions`: **token válido ✅**.
+- Ligas del propietario verificadas una a una contra la lista de acceso real:
+  - ✅ Confirmadas con acceso: `PD` LaLiga, `PL` Premier, `SA` Serie A, `BL1` Bundesliga, `CL` Champions
+  - ❌ `EL` Europa League **no incluida** en el free tier (solo hay 13 competiciones accesibles:
+    BSA, ELC, PL, CL, EC, FL1, BL1, SA, DED, PPL, CLI, PD, WC)
+- `00_CONTEXTO.md` actualizado: decisión original ajustada → EL fuera del MVP, se integrará
+  vía API-Football (100 req/día gratis). Extras disponibles gratis: FL1, BSA, ELC, PPL, DED, CLI, EC, WC.
+- Commits: `dfe9a1e` (Fases 0-1) · `c87201d` (decisiones de ligas) · docs de esta sesión.
+
+**Decisiones/problemas:**
+- PowerShell 5.1 no soporta `-ResponseHeadersVariable` (fue un error de herramienta, no de la API):
+  los primeros dos intentos de prueba fallaron por eso. Aprendido para scripts locales de Windows.
+- En el free tier el número de competiciones marcó 13; ligas extra (FL1, BSA...) quedan
+  documentadas como posibles ampliaciones de bajo costo (la propietario quiere sumar más ligas a futuro).
+
+**Siguientes pasos:**
+1. Propietario: instalar GitHub CLI (o crear el repo en github.com) para conectar el remoto —
+   el bloqueo NO impide la Fase 2, pero sí la Fase 10 (CI).
+2. Sesión siguiente — **Fase 2 (Ingesta):** cliente `pipeline/` de football-data.org con rate-limit
+   (10 req/min), endpoints de partidos/clasificación/plantillas/goleadores para PD, PL, SA, BL1, CL,
+   JSON crudo en `pipeline/raw/`.
+3. Después — **Fase 3:** esquema Postgres + Alembic.
+

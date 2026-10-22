@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22
+> Última actualización: 2026-10-22 (Sesión 2)
 
 ---
 
@@ -22,10 +22,10 @@
 - [ ] Badges de CI/CD en README (cuando existan los workflows)
 
 ## FASE 2 — INGESTA DE DATOS (football-data.org)
-- [ ] Cuenta + API key de football-data.org guardada en `.env` (solo local) y en GitHub Secrets
+- [x] Cuenta + API key de football-data.org — **creada y verificada contra la API real** (2026-10-22); guardada en `.env` local ✅ · *pendiente: GitHub Secrets cuando exista el repo remoto*
 - [ ] Cliente de API con rate-limit (10 req/min), reintentos y JSON crudo en `pipeline/raw/`
 - [ ] Endpoints: partidos (todos por temporada), clasificación, plantillas, goleadores
-- [ ] Ligas objetivo definidas (propuesta: LaLiga `PD` + Premier `PL`)
+- [ ] Ligas objetivo: **PD ✅ · PL ✅ · SA ✅ · BL1 ✅ · CL ✅** (2026-10-22) · EL ❌ fuera del free tier → deferida a API-Football
 
 ## FASE 3 — BASE DE DATOS POSTGRES
 - [ ] Esquema: `equipos`, `jugadores`, `partidos`, `stats_partido`, `stats_jugador`, `predicciones`, `reales_vs_previsto`
