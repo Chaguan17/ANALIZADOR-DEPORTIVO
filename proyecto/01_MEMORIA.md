@@ -617,6 +617,90 @@ refresco (12), motor de jugadores (13), extras (14), cierre (15).
 2. Fase 11: deploy a la nube (Neon + Render + Vercel) cuando el dueño dé
    luz verde — las variables de entorno ya están diseñadas.
 
+## Sesión 12 · 2026-10-22 · FASE 11 COMPLETA (deploy continuo: Neon + Render + Vercel)
+
+**Qué se hizo:**
+- **Preparativos del repo antes de que el dueño tocara un dashboard:**
+  - `render.yaml` blueprint raíz: runtime docker (`./backend/Dockerfile`,
+    contexto `./backend`), plan free, region frankfurt, health check
+    `/health`, autoDeploy commit, y `DATABASE_URL` como `sync: false`
+    (secreto pedido en el dashboard al crear el Blueprint).
+  - `backend/Dockerfile` rediseñado: el contenedor espeja el repo
+    (`WORKDIR /srv/backend`; COPY `app` + `alembic` + `alembic.ini`) y el
+    CMD arranca con `alembic upgrade head && exec uvicorn … --port
+    ${PORT:-8000}` — migraciones al arrancar (imposible un pre-deploy
+    separado: el free tier no da jobs one-off ni SSH) y puerto tal cual
+    lo inyecta el runtime (Render usa $PORT=10000; local mantiene 8000).
+  - Humo local completo ANTES de pushear: `docker build -t
+    analizador-api:fase11` verde en 2 modos (8000 y PORT=10000) contra la
+    BD real vía `host.docker.internal` → `/health` 200 con
+    1.590/3.756/937.
+  - Nota clave descubierta en la documentación oficial: Render detecta el
+    puerto "usualmente" (no garantizado) si no es $PORT → se eliminó la
+    apuesta vinculando uvicorn a `${PORT:-8000}` desde el inicio.
+
+**Cuatro bloques con el dueño en los dashboards (clic a clic guiado por el agente):**
+- **Neon**: proyecto `analizador` en eu-central-1 (Frankfurt) con endpoint
+  DIRECTO (sin -pooler) → DSN con `sslmode=require&channel_binding=require`.
+- **Migración de datos** con las herramientas que ya viven dentro de
+  `analizador_db` (psql/pg_dump del postgres:16-alpine, nada instalado en
+  Windows): `pg_dump -Fc` → `pg_restore --clean --if-exists --no-owner
+  --no-privileges` contra Neon + COUNT de validación exacto
+  (1.590/3.756/937) + chequeo `alembic_version` = head de migraciones
+  (0d3eb9476f9a, única revisión en la cadena) para que el primer arranque
+  en Render sea no-op.
+- **Render**: Sign up con GitHub → New → Blueprint → el yaml pre-cargó
+  todo (el dueño SOLO pegó el DSN transformado a
+  `postgresql+psycopg://…`). Render sufijó el nombre → URL REAL
+  **https://analizador-api-iule.onrender.com**. Verificación remota
+  200/200: `/health` (conteos exactos), `/fixtures?liga=PD` (3 modelos),
+  `/docs`, `/openapi.json`.
+- **Vercel**: repo importado → Root Directory `web` → 2 env vars con la
+  URL real de Render (`NEXT_PUBLIC_API_URL` + `API_URL_SERVIDOR`) →
+  **https://analizador-deportivo-rouge.vercel.app**. Verificado en
+  remoto: home SSR con fixtures de PD y los 3 modelos mencionados;
+  `/precision` con walk-forward y log losses reales (1.0449–1.0986);
+  rutas `/ranking/PD` y tabs `?liga=&modelo=`; el único match de
+  "Error" era la palabra `fallback` (JS interno).
+
+**CORS — deuda de la Fase 8 saldada** (commit `258a622`):
+- `CORS_ORIGINS` env (lista separada por comas) en `config.py`; default
+  seguro de desarrollo `http://localhost:3000`; producción alimenta
+  `https://analizador-deportivo-rouge.vercel.app` vía render.yaml (el
+  dominio pinneado vive en el repo, no en el código).
+- Middleware: `allow_methods=["GET","HEAD"]` (API pública de lectura),
+  `allow_credentials=False`; el SSR de la web NO pasa por CORS (sale del
+  servidor de Vercel).
+
+**Lecciones de sesión:**
+- El DSN que entrega Neon (con `channel_binding=require`) entra NATIVO en
+  psycopg3: la única transformación fue `postgresql://` →
+  `postgresql+psycopg://` (el `postgresql://` sin driver busca psycopg2,
+  que no está).
+- `pg_dump`/`pg_restore` a través de `docker exec` evita instalar el
+  cliente de postgres en Windows y hace `--clean` idempotente.
+- El sufijo de nombre de Render NO es predecible → copiar la URL del
+  dashboard y propagarla manualmente a Vercel (regla práctica).
+- Local Windows PowerShell 5.1 (cp1252): los mensajes pip/uvicorn dentro de
+  `docker logs` llegan con mojibake en consola cp1252 — inofensivo (los
+  archivos y la CI están bien); para humo HTTP usar python (urllib) o el
+  Code Mode en lugar de Invoke-WebRequest.
+
+**Estado tras Fase 11:** deploy continuo REAL de extremo a extremo —
+commit a main → CI (2 badges) → Render reconstruye la imagen Docker con
+migraciones al arrancar → Vercel reconstruye la web con las env vars.
+BD en la nube con TODO el histórico; la web pública ya consume la API
+pública. Dashboard README actualizado con la sección "☁️ Despliegue".
+
+**Siguientes pasos:**
+1. HIGIENE pendiente del dueño (menor): Reset password de Neon (el DSN
+   circuló en una captura de pantalla durante la Fase 11) + pegar el nuevo
+   DSN en Render → Environments → EDIT `DATABASE_URL` (el cambio re-deployea).
+2. Fase 12: cron `data-refresh.yml` con `DATABASE_URL` de Neon y
+   `FOOTBALL_API_KEY` como GitHub Secrets (el primer uso real del repo
+   securizado contra la BD en producción) + puertas anti-solapamiento y
+   auditables en Actions.
+
 
 
 

@@ -78,11 +78,25 @@
       llega con el cron de la Fase 12; CodeQL/Dependabot siguen opcionales) +
       estructura corregida frontend/ → web/
 
-## FASE 11 — DEPLOY CONTINUO
-- [ ] Neon: proyecto creado → `DATABASE_URL` en GitHub Secrets y Render
-- [ ] Render: auto-deploy backend `on push` + migraciones Alembic al arrancar
-- [ ] Vercel: importar repo → preview por PR + producción en main
-- [ ] Verificado: commit a main → despliegue automático de front y back
+## FASE 11 — DEPLOY CONTINUO ✓
+- [x] Neon: proyecto creado → `DATABASE_URL` en Render (el GitHub Secret
+      entra con el cron de la Fase 12); endpoint directo eu-central-1
+      (Frankfurt); datos volcados exactos (1.590/3.756/937) vía
+      `pg_dump -Fc` / `pg_restore --clean` desde el contenedor local +
+      `alembic_version` = head verificada
+- [x] Render: blueprint `render.yaml` (docker/free/frankfurt, health check
+      `/health`, autoDeploy commit, `DATABASE_URL` como secreto) + imagen
+      que espeja el repo con `alembic upgrade head` AL ARRANCAR (CMD) y
+      uvicorn en `${PORT:-8000}` → https://analizador-api-iule.onrender.com
+- [x] Vercel: repo importado → Root Directory `web` → env `NEXT_PUBLIC_API_URL`
+      + `API_URL_SERVIDOR` = URL de Render → https://analizador-deportivo-rouge.vercel.app
+      (producción en main automática + previews por PR)
+- [x] Verificado: commit a main → despliegue automático de front y back
+      (Render: el cambio de CORS del 2.º push fue observable en vivo en
+      producción; Vercel: deployments listados en su dashboard) +
+      `/health`, `/fixtures`, `/docs`, home SSR y `/precision` remotos
+      200 + CORS estrechado vía `CORS_ORIGINS` (deuda de la Fase 8
+      saldada, dominio de producción en render.yaml)
 
 ## FASE 12 — PIPELINE DE DATOS PROGRAMADO (data-refresh.yml)
 - [ ] Workflow cron (cada ~6 h): API → transformar → Postgres (Neon) → features → predicciones
