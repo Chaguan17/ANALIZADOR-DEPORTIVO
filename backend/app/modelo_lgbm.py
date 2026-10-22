@@ -59,8 +59,8 @@ from .evaluacion import (
     evaluar_liga,
 )
 from .features import HistoriaLiga, _nombres_equipos, _proximos, features_de_partido
-from .models import Partido
 from .modelo import NOMBRE_MODELO, predecir_y_guardar
+from .models import Partido
 
 NOMBRE_MODELO_LGBM = "lightgbm_v1"
 

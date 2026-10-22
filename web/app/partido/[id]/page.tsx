@@ -105,7 +105,7 @@ async function Contenido(props: PageProps<"/partido/[id]">) {
       </div>
 
       <p className="titulo-sub" style={{ marginTop: "1.2rem" }}>
-        λ = goles esperados de cada equipo. Los campos "—" significan que ese
+        λ = goles esperados de cada equipo. Los campos «—» significan que ese
         modelo no emite esa salida (LightGBM v1 es solo 1X2) — en vez de
         inventarnos números, los dejamos honestamente vacíos.
       </p>

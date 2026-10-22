@@ -66,9 +66,17 @@
 - [x] Integración con la API (`NEXT_PUBLIC_API_URL` navegador + `API_URL_SERVIDOR` para SSR/docker · contratos TS espejo 1:1 de Pydantic en `web/lib/api.ts` · fetch `no-store` dentro de `<Suspense>` → datos frescos por stream · humo 14 casos: 13×200 + 404-correcta · los errores de la API se narran con el comando para levantarla)
 
 ## FASE 10 — CI CONTINUO (.github/workflows/ci.yml)
-- [ ] Job backend: ruff → pytest → docker build
-- [ ] Job frontend: npm lint → npm build
-- [ ] Badges de estado en README (+ CodeQL y Dependabot opcionales)
+- [x] Job backend: ruff → pytest → docker build (2026-10-22: DOS workflows SEPARADOS
+      para 2 badges — desviación del nombre `ci.yml` del plano original documentada.
+      `ci-backend.yml`: setup-python 3.14 · pip -r backend/requirements.txt ·
+      ruff check backend pipeline · pytest -q (33 pruebas puras, sin BD) ·
+      docker build ./backend. pyproject.toml raíz: [tool.pytest] pythonpath="." +
+      testpaths, [tool.ruff] select explícito E4/E7/E9/F/I/RUF100)
+- [x] Job frontend: npm lint → npm build (ci-web.yml: setup-node 22 + cache npm ·
+      npm ci · npm run lint · npm run build; eslint limpio tras 2 fixes)
+- [x] Badges de estado en README (ci-backend.yml + ci-web.yml; Data Refresh badge
+      llega con el cron de la Fase 12; CodeQL/Dependabot siguen opcionales) +
+      estructura corregida frontend/ → web/
 
 ## FASE 11 — DEPLOY CONTINUO
 - [ ] Neon: proyecto creado → `DATABASE_URL` en GitHub Secrets y Render

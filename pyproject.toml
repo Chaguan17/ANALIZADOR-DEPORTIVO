@@ -1,0 +1,21 @@
+# Configuración de herramientas del repo (Fase 10: CI con GitHub Actions).
+#
+# pytest:  pythonpath="." deja importar `backend.app.*` corriendo pytest desde
+#          la raíz (así las pruebas van al paquete real, no a una copia).
+#          testpaths apunta a las pruebas puras (sin BD) de backend/tests/.
+# ruff:    line-length 100. Postura deliberada de reglas: errores de sintaxis
+#          y semántica (E4/E7/E9), pyflakes (F: variables muertas, imports sin
+#          usar, nombres indefinidos), orden de imports (I) y # noqa mentirosos
+#          (RUF100). se EXCLUYEN las reglas cosméticas (UP/B/FURB) para no
+#          generar churn: el código ya corre y las reglas cambian entre
+#          versiones de ruff — CI no debe romperse por moda.
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["backend/tests"]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "RUF100"]

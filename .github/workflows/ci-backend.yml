@@ -1,0 +1,37 @@
+# CI del lado PYTHON — Fase 10.
+# Qué defiende: sintaxis/semántica (ruff), las matemáticas honestas del
+# proyecto (pytest puras, SIN base de datos) y la imagen Docker del backend.
+#
+# Corre en cada push a main y en cada PR (repositorio público → Actions gratis).
+
+name: CI backend
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: ruff + pytest + docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependencias (versiones pinneadas)
+        run: pip install -r backend/requirements.txt
+
+      - name: Lint (ruff sobre backend + pipeline)
+        run: ruff check backend pipeline
+
+      - name: Pruebas unitarias (pytest, purezas, sin BD)
+        run: pytest -q
+
+      - name: Build de la imagen Docker del backend
+        run: docker build -t analizador-api:ci ./backend

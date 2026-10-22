@@ -540,6 +540,83 @@ enseña**. Pendientes: CI (Fase 10), deploy (11), cron (12), motor (13).
    build) — blindar ANTES de seguir creciendo.
 2. Fase 11: deploy (Neon + Render + Vercel) con las variables ya diseñadas.
 
+## Sesión 11 · 2026-10-22 · FASE 10 COMPLETA (CI continuo)
+
+**Qué se hizo:**
+- **33 pruebas pytest puras** (sin BD; 2.1 s en correr) en `backend/tests/`:
+  - `test_modelo.py` — la PMF de Poisson es distribución (~1 dentro del grid,
+    rabo >8 documentado), contracción bayesiana (`_encoger`: j=0 → 1.0,
+    j→∞ → casi la cruda, clamps MIN/MAX_FUERZA), cúpula de λ, el 1X2
+    renormalizado SIEMPRE suma 1 con over/under complementarios, simetría
+    con λ iguales, marcador estimado = argmax (λ 2.3/1.2 → "2-1") y la puerta
+    de DC con peso τ≡1 deja TODO igual.
+  - `test_modelo_dc.py` — τ solo toca las 4 celdas bajas y clampa a 0 cuando
+    λ·μ·ρ ≥ 1; RHO_GRID = 29 pasos de 0.0125; **LA JOYA: la invarianza over/
+    under 2.5 EXACTA (1e-12) para λ moderadas con ρ en todo el grid** — el
+    bono de marcadores bajos NO contamina el mercado de goles; y el rincón
+    del clamp (λ=4.5 con ρ=+0.05) documentado como comportamiento esperado.
+  - `test_evaluacion.py` — `_resultado_de` (local/empate/visita), `_agregar`
+    tolerante a None (promedia solo lo que existe; lista vacía → None, jamás
+    inventar 0) y MIN_EVIDENCIA=2 como guardián del calentamiento.
+  - `test_features.py` — `HistoriaLiga` fabricada vía `__new__` + `Registro`
+    (el constructor real pega a la BD; los métodos de consulta son puros):
+    ventana y corte temporal (fecha == hasta NO cuenta), snapshot_tabla con
+    desempate por diferencia de goles (B 2 pts dg−1 por ENCIMA de C 2 pts
+    dg−3), h2h en ambos roles, y los 31 features exactos para un caso
+    conocido (ppg casa 2.0, descanso 7 días, tabla 1.ª/2.ª) + equipo sin
+    historial → None/0 honestos.
+  - `test_lgbm.py` — etiqueta 0/1/2, mezcla honesta (w=0 → uniforme pura,
+    w=1 → árbol puro, suma 1 en TODO W_GRID), 21 valores paso 0.05, y
+    None → NaN (LightGBM los entiende; jamás ceros mentirosos).
+- **`pyproject.toml`** en la raíz: `[tool.pytest.ini_options]` con
+  `pythonpath=["."]+testpaths` → `pytest -q` desde la raíz va al paquete real;
+  `[tool.ruff]` line-length 100 con **select EXPLÍCITO**
+  E4/E7/E9/F/I/RUF100.
+- **ruff limpio sobre backend + pipeline**: 23 hallazgos → 11 auto-fixes
+  mecánicos (orden de imports, `# noqa` muertos, 1 import sin usar) +
+  1 variable muerta eliminada a mano en `pipeline/client.py` ("remaining");
+  la postura deliberada de NO incluir reglas cosméticas (UP/B/FURB/RUF007)
+  mantuvo fuera el B008 que sonaba — era el patrón INTENCIONAL de capturar
+  variables del loop en defaults del `def` (anti late-binding) en
+  `modelo_lgbm._predecir_con_lgbm` — ni se tocó.
+- **requirements.txt**: `ruff==0.17.2` y `pytest==9.1.1` pinneados bajo
+  comentario "solo CI" → lo que instala el workflow es EXACTAMENTE lo que
+  corrió local.
+- **web verde también**: eslint marcó como ERROR `react/no-unescaped-entities`
+  (comillas dobles en texto JSX del detalle → cambiadas a «—») y 1 import
+  muerto en `precision`; `npm run lint` y `npm run build` OK.
+- **Dos workflows separados** (un badge cada uno): `ci-backend.yml`
+  (checkout → setup-python 3.14 → pip -r → ruff check backend pipeline →
+  pytest -q → docker build ./backend) y `ci-web.yml` (checkout → setup-node
+  22 + cache npm por `web/package-lock.json` → `npm ci` → lint → build con
+  `working-directory: web`). Repositorio público → Actions gratis.
+- README: badges reales de los 2 workflows (+ nota: badge Data Refresh con
+  la Fase 12) y estructura corregida `frontend/` → `web/`.
+- Des-riskeo del paso Docker: `docker build -t analizador-api:ci ./backend`
+  verde localmente ANTES del push (pip de linux 3.14-slim instaló todo,
+  incluidos los pins nuevos).
+
+**Lecciones de sesión:**
+- Las pruebas sin BD eran posibles porque TODOS los imports del backend son
+  perezosos: `db.py` construye el engine sin conectar y `config.py` tiene
+  fallback local → CI sin servicio postgres, sin secretos, verde en ~2 min.
+- Curiosidad al escribir pruebas con expectativa conocida: el marcador
+  argmax con λ=2.0 exacto EMPATA (P(1)=P(2)) → se eligieron λe que ganen
+  estricto; y el helper `dt(dia)` de fechas mordió (se le añadió `mes=8`
+  porque `dt(5, 9)` era agosto, no septiembre).
+- `pythonpath=["."]` de pytest≥7 es la forma limpia de importar `backend.app.*`
+  sin instalar el paquete ni tocar conftests.
+
+**Estado tras Fase 10:** el repo queda blindado — todo push a main (y cada
+PR) corre ruff + 33 pruebas + docker build + lint/build web automaticamente;
+2 badges en el README cuentan la historia. Pendientes: deploy (11), cron de
+refresco (12), motor de jugadores (13), extras (14), cierre (15).
+
+**Siguientes pasos:**
+1. Confirmar los 2 workflows EN GitHub (poll vía API pública hasta verde).
+2. Fase 11: deploy a la nube (Neon + Render + Vercel) cuando el dueño dé
+   luz verde — las variables de entorno ya están diseñadas.
+
 
 
 

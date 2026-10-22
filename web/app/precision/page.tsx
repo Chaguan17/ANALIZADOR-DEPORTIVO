@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import Aviso, { Cargando } from "@/components/Aviso";
 import { obtenerPrecision, type MetricasModelo } from "@/lib/api";
-import { LIGAS, nombreLiga, nombreModelo, num, pct } from "@/lib/formato";
+import { LIGAS, nombreModelo, num, pct } from "@/lib/formato";
 
 export const metadata = { title: "Precisión" };
 

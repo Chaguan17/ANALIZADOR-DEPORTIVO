@@ -11,19 +11,17 @@ import sys
 from logging.config import fileConfig
 from pathlib import Path
 
-from sqlalchemy import pool
-from sqlalchemy import engine_from_config
-
 from alembic import context
+from sqlalchemy import engine_from_config, pool
 
 # repo/backend/alembic/env.py → raíz del repo = 3 niveles arriba
 REPO_ROOT = Path(__file__).resolve().parents[2]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
+import backend.app.models  # noqa: E402,F401  (registra los modelos en Base.metadata)
 from backend.app.config import DATABASE_URL  # noqa: E402
 from backend.app.db import Base  # noqa: E402
-import backend.app.models  # noqa: E402,F401  (registra los modelos en Base.metadata)
 
 config = context.config
 

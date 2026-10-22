@@ -7,10 +7,9 @@ con pipeline de datos automatizado, CI/CD y un despliegue 100% gratuito.
 calibración) **y** un proyecto de portafolio Full Stack + DevOps construido con estándares
 reales de la industria.
 
-<!-- BADGES CI/CD (se añaden en la Fase 10, cuando existan los workflows de GitHub Actions)
-[![CI](https://github.com/USUARIO/REPO/actions/workflows/ci.yml/badge.svg)](...)
-[![Data Refresh](https://github.com/USUARIO/REPO/actions/workflows/data-refresh.yml/badge.svg)](...)
--->
+[![CI backend](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-backend.yml)
+[![CI web](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-web.yml/badge.svg)](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-web.yml)
+<!-- Data Refresh (cron) llegará con la Fase 12 -->
 
 ## 🧱 Stack
 
@@ -26,11 +25,11 @@ reales de la industria.
 ## 📁 Estructura
 
 ```
-├── frontend/           UI Next.js (predicciones, perfiles, rankings)
-├── backend/            API FastAPI + modelos predictivos
-├── pipeline/           Ingesta de datos de football-data.org
-├── proyecto/           Gobernanza: contexto, memoria y plano maestro del proyecto
-└── .github/workflows/  CI · Deploy · refresco de datos programado
+├── web/                 UI Next.js (predicciones, perfiles, rankings)
+├── backend/             API FastAPI + modelos predictivos + pruebas pytest
+├── pipeline/            Ingesta de datos de football-data.org
+├── proyecto/            Gobernanza: contexto, memoria y plano maestro del proyecto
+└── .github/workflows/   CI backend · CI web · (deploy y cron: fases 11-12)
 ```
 
 ## 🚀 Inicio rápido (desarrollo local)

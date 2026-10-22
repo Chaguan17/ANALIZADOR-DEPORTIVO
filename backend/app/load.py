@@ -23,12 +23,12 @@ from sqlalchemy import func, select
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
+# Puente a la Fase 2 (single source of truth de ligas/temporada/carpeta cruda)
+from pipeline.config import LIGAS_MVP, RAW_DIR, SEASON
+
 from .consola import consola_utf8
 from .db import SessionLocal
 from .models import Clasificacion, Equipo, Jugador, Partido
-
-# Puente a la Fase 2 (single source of truth de ligas/temporada/carpeta cruda)
-from pipeline.config import LIGAS_MVP, RAW_DIR, SEASON
 
 logger = logging.getLogger("backend.load")
 

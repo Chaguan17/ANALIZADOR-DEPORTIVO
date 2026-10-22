@@ -55,7 +55,6 @@ class FootballDataClient:
             self._last_request = time.monotonic()
 
             if response.status_code == 200:
-                remaining = response.headers.get("X-RequestCounter-Remaining", "?")
                 return response.json()
 
             # Reintentable: excedimos la ventana de 10/min o hubo un fallo del servidor

@@ -41,8 +41,8 @@ from sqlalchemy import select
 from .consola import consola_utf8
 from .db import SessionLocal
 from .features import HistoriaLiga, _nombres_equipos
-from .models import Partido, RealesVsPrevisto
 from .modelo import NOMBRE_MODELO, predecir
+from .models import Partido, RealesVsPrevisto
 
 EPSILON = 1e-15          # clip para que -log no reviente con probabilidades ~0
 MIN_EVIDENCIA = 2        # calentamiento: mínimo de partidos previos para evaluar

@@ -5,8 +5,8 @@ Revises:
 Create Date: 2026-10-22 20:52:59.103951
 Contexto: ANALIZADOR DEPORTIVO (esquema generado desde backend/app/models.py)
 """
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = '0d3eb9476f9a'
