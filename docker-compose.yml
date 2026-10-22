@@ -1,0 +1,34 @@
+# Desarrollo local — ANALIZADOR DEPORTIVO
+# Estado actual (Fase 1): solo la base de datos.
+# El servicio "db" duplica lo que será Neon en producción → la misma Postgres
+# en local y en la nube evita sorpresas al desplegar (Fase 11).
+#
+# Uso:   docker compose up -d db
+# Stop:  docker compose down          (los datos persisten en el volumen pgdata)
+# Borrar datos: docker compose down -v
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: analizador_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: analizador
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-devpassword}   # solo local, no es secreto de producción
+      POSTGRES_DB: analizador
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analizador -d analizador"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # ── Se añaden en fases siguientes ─────────────────────
+  # api:  FastAPI + modelos (Fases 2-3, 8)  → depende de: db
+  # web:  Next.js (Fase 9)                  → depende de: api
+
+volumes:
+  pgdata:
