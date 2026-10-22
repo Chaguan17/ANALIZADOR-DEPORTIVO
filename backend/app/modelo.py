@@ -49,6 +49,7 @@ MAX_GOLES = 8  # grid de marcadores 0..8 × 0..8 (suficiente para 99.9%)
 K_SHRINK = 8
 MIN_FUERZA, MAX_FUERZA = 0.4, 2.5
 LAMBDA_MIN, LAMBDA_MAX = 0.2, 4.5
+MU_MINIMO = 0.1  # piso de medias de liga (evita división por cero en arranque frío)
 
 
 def _pmf_poisson(lam: float) -> list[float]:
@@ -102,6 +103,12 @@ class ParametrosLiga:
 
         mu_casa = mu_casa_goles / n
         mu_visita = mu_visita_goles / n
+        # Piso defensivo: en los primeros partidos los μ pueden ser 0.0
+        # (p. ej., único partido previo con visita sin marcar) → nunca dividir por 0.
+        # Con la contracción K_SHRINK activa, las fuerzas con j pequeño están
+        # pegadas a 1.0, así que el piso no genera λ explosivos.
+        mu_casa = max(mu_casa, MU_MINIMO)
+        mu_visita = max(mu_visita, MU_MINIMO)
         todos = set(gf_casa) | set(gf_fuera) | set(gc_casa) | set(gc_fuera)
 
         atk_casa: dict[int, float] = {}
@@ -138,11 +145,16 @@ def predecir(
 
     # Cúpula de λ: el producto multiplicativo puede explotar si atk y dfn son
     # extremos a la vez (Champions con 3 fechas) → se acopla a lo realista.
+    # Equipos que aún no han jugado (arranque frío) → fuerza neutral 1.0.
     lam_local = _cupir_lambda(
-        params["mu_casa"] * params["atk_casa"][id_local] * params["dfn_fuera"][id_visitante]
+        params["mu_casa"]
+        * params["atk_casa"].get(id_local, 1.0)
+        * params["dfn_fuera"].get(id_visitante, 1.0)
     )
     lam_visita = _cupir_lambda(
-        params["mu_visita"] * params["atk_fuera"][id_visitante] * params["dfn_casa"][id_local]
+        params["mu_visita"]
+        * params["atk_fuera"].get(id_visitante, 1.0)
+        * params["dfn_casa"].get(id_local, 1.0)
     )
 
     pmf_l = _pmf_poisson(lam_local)
@@ -189,10 +201,10 @@ def predecir(
         "marcador_estimado": f"{mejor_marca[0]}-{mejor_marca[1]}",
         "mu_casa": params["mu_casa"],
         "mu_visita": params["mu_visita"],
-        "atk_casa_local": params["atk_casa"][id_local],
-        "dfn_fuera_visita": params["dfn_fuera"][id_visitante],
-        "atk_fuera_visita": params["atk_fuera"][id_visitante],
-        "dfn_casa_local": params["dfn_casa"][id_local],
+        "atk_casa_local": params["atk_casa"].get(id_local, 1.0),
+        "dfn_fuera_visita": params["dfn_fuera"].get(id_visitante, 1.0),
+        "atk_fuera_visita": params["atk_fuera"].get(id_visitante, 1.0),
+        "dfn_casa_local": params["dfn_casa"].get(id_local, 1.0),
         "masa_grid": masa_grid,
         "datos": params["partidos_hasta"],  # nº de partidos usados como evidencia
     }

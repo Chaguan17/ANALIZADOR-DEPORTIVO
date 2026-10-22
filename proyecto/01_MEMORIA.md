@@ -232,6 +232,58 @@ con ρ) y LightGBM con los 31 features de Fase 4. Variantes vs baseline.
    contra los partidos FINISHED recientes) → números de precisión reales
 3. Después: Fase 8 (API) ya tiene datos que servir en `prediccion`.
 
+---
+
+## Sesión 7 · 2026-10-22 · FASE 7 COMPLETA (evaluación walk-forward del baseline)
+
+**Qué se hizo:**
+- `backend/app/evaluacion.py` — evaluador walk-forward:
+  - evalúa TODOS los partidos FINISHED de cada liga con el MISMO `predecir()`
+    de la Fase 5 → lo que medimos es exactamente lo que se vende en vivo
+  - métricas: log loss, Brier 1X2, accuracy 1X2, accuracy/Brier de over-2.5,
+    MAE de goles (|λ − real|), calibración por cubetas de 10%
+  - `--peores N`: lista los fallos más caros (donde más log loss se quemó)
+  - persistencia idempotente en `reales_vs_previsto` por (partido, modelo):
+    323 filas → eliminadas + reinsertadas → 323 pares únicos ✓
+- **Verificación cruzada SQL puro vs Python:** accuracy/log loss/Brier por liga
+  computados también en psql → coincidencia exacta al 4° decimal en las 5 ligas.
+
+**Bugs reales que la evaluación sacó a la luz (y correcciones):**
+1. ZeroDivisionError: el primer partido de la temporada → μ_visita=0
+   (único previo con visita en cero). Corregido: piso MU_MINIMO=0.1 en `calcular()`.
+2. KeyError: equipo que debuta y no existe en los diccionarios de fuerzas →
+   corregido con fallback `get(equipo, 1.0)` (fuerza neutral, ya documentado).
+3. Calentamiento: los partidos con <2 evidencias previas se saltan (14 de 337).
+   Las 1.252 predicciones vivas NO cambian (todas tienen ≥90 partidos de
+   evidencia — muy lejos del piso).
+
+**Resultados honestos (temporada 2026, 323 partidos):**
+| Liga | Accuracy | Log loss | Brier | vs siempre-local |
+|---|---|---|---|---|
+| PD  | 48.3% | 1.0521 | 0.6336 | GANA (42.5%) |
+| PL  | 35.3% | 1.1588 | 0.6972 | PIERDE accuracy Y log loss > uniforme 1.0986 |
+| SA  | 39.7% | 1.0675 | 0.6448 | PIERDE accuracy (47.1%) |
+| BL1 | 50.0% | 1.0524 | 0.6292 | Empata (50.0%) |
+| CL  | 55.8% | **0.9630** | 0.5748 | PIERDE accuracy (59.6%) |
+| TOTAL | 45.2% | 1.0635 | 0.6392 | -1.2 pts vs siempre-local (46.4%) |
+
+**Lecturas (lo que enseña el número):**
+- El modelo SIEMPRE supera al azar uniforme en probabilidad total (log loss/Brier),
+  pero en accuracy compite de igual a igual con "siempre local" → el margen
+  del baseline es ajustado: la señal está en la forma, no solo en la ventaja local.
+- La Premier es el punto débil: log loss PEOR que el azar (1.1588) → sobreconfianza
+  en locales (cubeta 50-60: prometía 54%, acertaba 22%). Más evidencia + DC.
+- La Champions es donde mejor calibra (log loss 0.9630) — sorprende con 3 fechas.
+- Los fallos caros del log loss son casi siempre "favorito local derrotado":
+  la sobreconfianza en favoritos fuertes es EL detonante a atacar con Dixon-Coles.
+- O2.5 débil en SA/PL (modelo tiende a under en ligas donde el 2026 va a goles).
+
+**Siguientes pasos:**
+1. Fase 5b Dixon-Coles con los hallazgos a cuestas: bajar la sobreconfianza en
+   favoritos y ajustar empates (el modelo predice 1-1 todo el rato).
+2. o Fase 8: API FastAPI para congelar los humildes números del baseline V1 y
+   exponerlos al frontend (la historia "Baseline1 → mejoras en la versión 2").
+
 
 
 

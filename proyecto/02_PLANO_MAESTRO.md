@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22 (Sesión 6)
+> Última actualización: 2026-10-22 (Sesión 7)
 
 ---
 
@@ -51,9 +51,9 @@
 - [ ] Prob. de marcar · props over/under · respaldo FBref/Understat si faltan datos
 
 ## FASE 7 — EVALUACIÓN Y VALIDACIÓN
-- [ ] Backtesting walk-forward (nunca entrenar con el futuro)
-- [ ] Métricas: log loss, Brier, calibración, accuracy 1X2, benchmark vs cuotas
-- [ ] Registro de cada evaluación en `01_MEMORIA.md`
+- [x] Backtesting walk-forward (nunca entrenar con el futuro) (2026-10-22: `backend/app/evaluacion.py`; el `predecir()` es date-aware → evaluar el pasado rehace la predicción en vivo; calentamiento: 14 partidos saltados, 323 evaluados)
+- [x] Métricas: log loss, Brier, calibración, accuracy 1X2 (+O2.5, MAE goles) · benchmark 'vs cuotas' sustituido por baselines universales (free tier no da cuotas): total accuracy 45.2%, log loss 1.0635 < 1.0986 (uniforme), Brier 0.6392 < 0.6667
+- [x] Registro de cada evaluación en `01_MEMORIA.md` (Sesión 7) + filas por partido en `reales_vs_previsto` (323 filas, idempotentes, verificadas contra SQL puro)
 
 ## FASE 8 — API REST FASTAPI
 - [ ] Endpoints: `/health` `/fixtures` `/predictions/{id}` `/teams/{id}` `/players/{id}` `/rankings` `/model-accuracy`
