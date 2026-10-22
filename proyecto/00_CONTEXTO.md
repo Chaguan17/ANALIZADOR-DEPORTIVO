@@ -41,6 +41,7 @@ y despliegue 100% gratuito. Doble propósito:
 | 2026-10-22 | Nivel DevOps del propietario: **práctica desde cero** | El plan enseña cada paso de CI/CD; no se asume conocimiento previo |
 | 2026-10-22 | Ligas MVP: **LaLiga (PD) · Premier (PL) · Serie A (SA) · Bundesliga (BL1) · Champions (CL)** | Decisión del propietario; se ampliará a futuro. |
 | 2026-10-22 | **Europa League (EL) fuera del MVP inicial** | Confirmado con la API key real: el free tier de football-data.org solo da acceso a 13 competiciones (BSA, ELC, PL, CL, EC, FL1, BL1, SA, DED, PPL, CLI, PD, WC) y **EL no está entre ellas** (HTTP 403). Se integrará después vía API-Football (100 req/día gratis). |
+| 2026-10-22 | **Esquema Fase 3**: PKs = id de la API · tabla `clasificacion` añadida (fuente: standings) · `stats_*` usan JSONB extensible y se llenan en Fases 4-8 | El upsert por id de la API hace la carga naturalmente idempotente; los stats del free tier son flexibles; desviación bienintencionada del nombre del plano documentada |
 
 ## 4. STACK TÉCNICO
 

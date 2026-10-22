@@ -1,0 +1,5 @@
+# Dependencias del backend (Fase 3: DB. Fase 8: API) — fijadas tras instalar con éxito
+sqlalchemy==2.1.6
+alembic==1.20.1
+psycopg[binary]==3.3.6
+python-dotenv==1.2.4

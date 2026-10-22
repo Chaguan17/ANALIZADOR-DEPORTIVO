@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22 (Sesión 3)
+> Última actualización: 2026-10-22 (Sesión 4)
 
 ---
 
@@ -24,14 +24,15 @@
 ## FASE 2 — INGESTA DE DATOS (football-data.org)
 - [x] Cuenta + API key de football-data.org — **creada y verificada contra la API real** (2026-10-22); guardada en `.env` local ✅ · *pendiente: GitHub Secrets cuando exista el repo remoto → repo creado 2026-10-22; secrets se añaden al crear workflows (Fase 10-12)*
 - [x] Cliente de API con rate-limit (10 req/min), reintentos y JSON crudo en `pipeline/raw/` (2026-10-22: `pipeline/client.py` con pacing + backoff + caché-first)
-- [x] Endpoints: partidos (season fija 2026), clasificación, equipos, goleadores (2026-10-22: 5 ligas × 4 fuentes = 20 requests OK; **goleadores limitados a top-10 por el free tier**; PD tiene 1 partido CANCELLED a headlights)
+- [x] Endpoints: partidos (season fija 2026), clasificación, equipos, goleadores (2026-10-22: 5 ligas × 4 fuentes = 20 requests OK; **goleadores limitados a top-10 por el free tier**; PD tiene 1 partido CANCELLED registrado)
 - [x] Ligas objetivo: **PD ✅ · PL ✅ · SA ✅ · BL1 ✅ · CL ✅** (2026-10-22) · EL ❌ fuera del free tier → deferida a API-Football
 - [x] QA de datos crudos sin gasto de cuota (2026-10-22: `pipeline/qa.py`, 24 archivos válidos, 0 problemas)
 
 ## FASE 3 — BASE DE DATOS POSTGRES
-- [ ] Esquema: `equipos`, `jugadores`, `partidos`, `stats_partido`, `stats_jugador`, `predicciones`, `reales_vs_previsto`
-- [ ] Migraciones con Alembic (primera migración inicial)
-- [ ] Cargas idempotentes (upsert) + chequeos de calidad (duplicados/nulos/fechas)
+- [x] Esquema `equipos`, `jugadores`, `partidos`, `clasificacion`, `stats_partido`, `stats_jugador`, `prediccion`, `reales_vs_previsto` (2026-10-22: PK = id de la API; clasificacion añadida como tabla real — registrado en CONTEXTO; stats_*/predicciones creadas vacías para Fases 4-8)
+- [x] Migraciones con Alembic: autogeneración + `upgrade head` sobre Postgres dockerizado (2026-10-22, rev `0d3eb9476f9a`)
+- [x] Cargas idempotentes (upsert merge por id) + QA: 96 equipos · 47 jugadores · 1.590 partidos · 114 filas de clasificación; 2ª pasada = 0 nuevos en todo; QA anti-duplicados OK
+- [x] Demo de consulta real vía `docker exec` + psql (top 8 de LaLiga desde la BD)
 
 ## FASE 4 — MÉTRICAS DE RENDIMIENTO (features)
 - [ ] Features de equipo: forma, goles fav/contra, local/visita, H2H, tabla, descanso

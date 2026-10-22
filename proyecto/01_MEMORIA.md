@@ -110,4 +110,44 @@
    partidos ya guardados (upsert por id de la API).
 3. Fase 10 según su momento: crear repo Secrets cuando existan workflows.
 
+---
+
+## Sesión 4 · 2026-10-22 · FASE 3 COMPLETA (Postgres + Alembic + carga idempotente)
+
+**Qué se hizo:**
+- Propietario ejecutó Docker manualmente (aprendizaje práctico solicitado):
+  `docker compose up -d db` → estado **healthy**; entendió imagen/contenedor/volumen/puerto.
+- Backend Fase 3 construido:
+  - `backend/requirements.txt` — sqlalchemy==2.1.6 · alembic==1.20.1 · psycopg[binary]==3.3.6
+  - `backend/app/config.py` — carga el MISMO `.env` raíz (DATABASE_URL)
+  - `backend/app/db.py` — engine + SessionLocal + Base declarativa
+  - `backend/app/consola.py` — helper UTF-8 compartido (cp1252 de Windows)
+  - `backend/app/models.py` — 8 tablas: equipos, jugadores, partidos, clasificacion,
+    stats_partido, stats_jugador, prediccion, reales_vs_previsto
+  - `backend/app/load.py` — cargador idempotente (merge por id) + QA anti-duplicados
+- Alembic: `alembic.ini` + `env.py` (URL injectada desde app/config) + migración autogenerada
+  `20261022_0d3eb9476f9a` + `upgrade head` aplicado a Postgres dockerizado.
+- **Carga inicial: 96 equipos · 47 jugadores · 1.590 partidos · 114 filas de clasificación.**
+- **Idempotencia probada**: 2ª corrida → 0 nuevos en las 4 tablas.
+- Demo de SQL del propietario vía `docker exec` + psql: top 8 LaLiga desde la BD propia.
+
+**Decisiones/problemas de esta sesión:**
+- Plantilla script.py.mako le faltaba `${imports}` → el JSONB no importaba `postgresql`
+  en la migración generada. Primer `upgrade` falló y SCI-rollback limpio gracias al DDL
+  transaccional de Postgres (nada quedó a medias). Aprendido: tipos de dialecto requieren
+  import en la migración; la plantilla ya lo soporta.
+- Esquema refina el plano original: `clasificacion` añadida como tabla real (standings)
+  y nombres al singular conforme al resto; decisión registrada en 00_CONTEXTO.
+- Conteos con `func.count().select_from(Model)` (idomático SQLAlchemy 2).
+
+**Siguientes pasos:**
+1. **FASE 4 — métricas/featurización** (carpeta backend/models o feature_store):
+   forma por ventana de N partidos desde `partidos` FINISHED, H2H, fuerza local/visita,
+   patron de jornada; rates por 90' de jugadores. Salida: tabla `stats_partido` mencionada.
+2. Después — **FASE 5:** Poisson doble baseline sobre esos features (predicción 1X2
+   primera generación) → guardar en `prediccion` con modelo "poisson_doble".
+3. Ritual de datos: tras semana nueva de partidos → `python -m pipeline` + `python -m backend.app.load`
+   (futuro: solo se añade lo nuevo gracias a caché + upsert).
+
+
 
