@@ -39,6 +39,7 @@ y despliegue 100% gratuito. Doble propósito:
 | 2026-10-22 | Base de datos **Postgres** (no SQLite) | Requisito del despliegue en la nube (Neon) |
 | 2026-10-22 | Hosting: **Vercel** (front) + **Render** (backend) + **Neon** (DB) | Free tiers; Docker permite migrar si un free tier cambia |
 | 2026-10-22 | Nivel DevOps del propietario: **práctica desde cero** | El plan enseña cada paso de CI/CD; no se asume conocimiento previo |
+| 2026-10-22 | Ligas MVP: **LaLiga (PD) · Premier (PL) · Serie A (SA) · Bundesliga (BL1) · Champions (CL) · Europa League (EL)** | Decisión del propietario; se ampliará a futuro. ⚠️ EL puede NO estar incluida en el free tier de football-data.org (tier gratuito cubre PD, PL, SA, BL1, FL1, CL): la Fase 2 lo verificará con la API key y si falla, se documenta y se agrega después vía API-Football |
 
 ## 4. STACK TÉCNICO
 
@@ -86,13 +87,14 @@ ANALIZADOR DEPORTIVO/
 ## 8. FUENTES DE DATOS
 
 - **Principal:** football-data.org → competiciones/partidos/clasificación/plantillas/goleadores
-  (LaLiga `PD`, Premier `PL`, Serie A `SA`, Bundesliga `BL1`, Ligue 1 `FL1`, Champions `CL`, etc.)
+- **Ligas del MVP (código en football-data.org):** LaLiga `PD` · Premier `PL` · Serie A `SA` ·
+  Bundesliga `BL1` · Champions `CL` · Europa League `EL` (⚠️ verificar acceso con la API key del free tier)
 - **Respaldo para jugadores (Fase 6):** FBref / Understat (CSV o scraping puntual)
 - **Límites:** 10 peticiones/minuto en el tier gratuito → todos los datos se persisten en Postgres;
   nunca se pide a la API lo que ya está guardado.
 
 ## 9. PENDIENTE POR DECIDIR
 
-- [ ] Liga(s) objetivo del MVP (propuesta: LaLiga + Premier por cobertura de la API)
-- [ ] Nombre final del repo en GitHub
+- [x] ~~Liga(s) objetivo del MVP~~ → decidido 2026-10-22: PD, PL, SA, BL1, CL, EL (ver acceso free tier en Fase 2)
+- [ ] Nombre final del repo en GitHub (remoto conectado más adelante, decisión del propietario)
 - [ ] Licencia (MIT recomendado si es público)
