@@ -286,7 +286,7 @@ con ρ) y LightGBM con los 31 features de Fase 4. Variantes vs baseline.
 
 ---
 
-## Sesión 8 · 2026-10-22 · FASE 5b COMPLETA (Dixon-Coles) → luego FASE 8
+## Sesión 8 · 2026-10-22 · FASE 5b COMPLETA (Dixon-Coles) + FASE 8 COMPLETA (API FastAPI)
 
 **Qué se hizo (Fase 5b — Dixon-Coles):**
 - Refactor DRY de `modelo.py`: el grid de marcadores vive ahora en el helper
@@ -343,10 +343,41 @@ con ρ) y LightGBM con los 31 features de Fase 4. Variantes vs baseline.
 · 646 evaluaciones (2 modelos × 323) · fixture de ρ: PD −0.2125, PL −0.0875,
 SA/BL1/CL +0.05.
 
+**FASE 8 COMPLETA — API FastAPI (misma sesión):**
+- `backend/app/api.py`: 7 endpoints con contratos Pydantic y sesión de BD por
+  petición (`Depends(get_session)`):
+  `/health` (latido + conteos: 1.590 partidos · 2.504 predicciones · 646
+  evaluaciones) · `/fixtures?liga&limite` (próximos con TODOS los modelos por
+  partido — 2 queries sin N+1) · `/predictions/{id}` (JSONB completo, incluye
+  ρ en DC) · `/teams/{id}` (ficha + clasificación + últimos 5 + próximos 3) ·
+  `/players/{id}` · `/rankings?liga` (standings) · `/model-accuracy`
+  (métricas REALES por modelo y liga, agregadas en SQL).
+- CORS `["*"]` para consumir desde Vercel (se estrecha en producción).
+- Errores honestos: 400 si la liga no es PD/PL/SA/BL1/CL · 404 si el id no existe.
+- Docker: `backend/Dockerfile` (python:3.14-slim → requirements → app/ →
+  `uvicorn app.api:app`) + servicio `api` en docker-compose
+  (`depends_on: db healthy`, `DATABASE_URL` apuntando al host `db`).
+  El build/arranque lo ejecuta el PROPIETARIO manualmente
+  (`docker compose up -d db api`) — regla del proyecto (no automatizo sus contenedores).
+- Prueba de humo con python urllib (más robusto que PowerShell 5.1): 7
+  endpoints HTTP 200, /docs 200, y los comportamientos de error 400/404 verificados.
+- requirements del backend + fastapi 0.161.0 · pydantic 2.14.1 · uvicorn 0.54.0.
+- README del backend reescrito (estructura completa, comandos, tabla de endpoints).
+- Correcciones de camino: en /fixtures se instanciaba el `Fixture` sin el campo
+  obligatorio `predicciones` (Pydantic v2 valida al CREAR — la lista se arma
+  antes) y un SyntaxWarning de backslashes de Windows en el docstring.
+
+**Estado final tras la sesión doble (Fase 5b + 8):**
+- Commits: `03af197` (Fase 5b) + el de Fase 8.
+- BD: 1.590 partidos · 2.504 predicciones (baseline + DC × 1.252) ·
+  646 evaluaciones (baseline + DC × 323).
+- Plano: Fases 5b y 8 marcadas [x]; pendientes: LightGBM (5c), frontend (9),
+  CI (10), deploy (11), cron (12), motor (13) y el grueso de 14-15.
+
 **Siguientes pasos:**
-1. FASE 8: API FastAPI sirviendo AMBOS modelos (endpoints /predictions,
-   /model-accuracy ya comparan por modelo).
-2. Después: LightGBM (Fase 5c) o frontend (Fase 9) o CI (Fase 10).
+1. Fase 9: frontend Next.js consumiendo la API ya viva (fixtures/predicciones
+   ya devuelven AMBOS modelos).
+2. o Fase 10 CI primero (ruff/pytest/build) para blindar antes de crecer.
 
 
 

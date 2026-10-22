@@ -3,7 +3,7 @@
 # El servicio "db" duplica lo que será Neon en producción → la misma Postgres
 # en local y en la nube evita sorpresas al desplegar (Fase 11).
 #
-# Uso:   docker compose up -d db
+# Uso:   docker compose up -d db api      (api = FastAPI, Fase 8)
 # Stop:  docker compose down          (los datos persisten en el volumen pgdata)
 # Borrar datos: docker compose down -v
 
@@ -26,9 +26,21 @@ services:
       timeout: 3s
       retries: 10
 
+  api:
+    build: ./backend
+    container_name: analizador_api
+    restart: unless-stopped
+    environment:
+      # host "db" = DNS interno de la red de compose (no localhost)
+      DATABASE_URL: postgresql+psycopg://analizador:${POSTGRES_PASSWORD:-devpassword}@db:5432/analizador
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
   # ── Se añaden en fases siguientes ─────────────────────
-  # api:  FastAPI + modelos (Fases 2-3, 8)  → depende de: db
-  # web:  Next.js (Fase 9)                  → depende de: api
+  # web:  Next.js (Fase 9) → depende de: api
 
 volumes:
   pgdata:

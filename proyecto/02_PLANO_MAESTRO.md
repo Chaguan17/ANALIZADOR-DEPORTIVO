@@ -56,9 +56,9 @@
 - [x] Registro de cada evaluación en `01_MEMORIA.md` (Sesión 7) + filas por partido en `reales_vs_previsto` (323 filas, idempotentes, verificadas contra SQL puro)
 
 ## FASE 8 — API REST FASTAPI
-- [ ] Endpoints: `/health` `/fixtures` `/predictions/{id}` `/teams/{id}` `/players/{id}` `/rankings` `/model-accuracy`
-- [ ] Pydantic + Swagger (`/docs`) + Dockerfile del backend
-- [ ] `docker-compose` con `db` + `api` + `web` funcionando en local
+- [x] Endpoints: `/health` `/fixtures` `/predictions/{id}` `/teams/{id}` `/players/{id}` `/rankings` `/model-accuracy` (2026-10-22: `backend/app/api.py` · prueba de humo con urllib 7×200 + 400 liga inválida + 404 id inexistente · CORS `["*"]` para consumirse desde Vercel · sesión por petición con `Depends`)
+- [x] Pydantic + Swagger (`/docs` verificado HTTP 200) + Dockerfile del backend (`backend/Dockerfile`: python:3.14-slim, deps fijadas, `uvicorn app.api:app` en :8000)
+- [x] `docker-compose` con `db` + `api` en local (servicio `api` con `depends_on: db healthy` · build/arranque 100% manual del propietario: `docker compose up -d db api` · la `web` de Next.js llega en Fase 9)
 
 ## FASE 9 — FRONTEND NEXT.JS
 - [ ] Scaffold con TypeScript + Tailwind + App Router
