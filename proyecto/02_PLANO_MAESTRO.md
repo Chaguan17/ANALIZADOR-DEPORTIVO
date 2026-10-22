@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22 (Sesión 5)
+> Última actualización: 2026-10-22 (Sesión 6)
 
 ---
 
@@ -41,10 +41,10 @@
 - [~] Features de JUGADOR → **deferido a Fase 6** por límite de datos del free tier (solo top-10 goleadores agregados, sin minutos ni por partido)
 
 ## FASE 5 — MODELO DE EQUIPO
-- [ ] Baseline: Poisson doble (marcadores esperados local/visita)
+- [x] Baseline: Poisson doble (marcadores esperados local/visita) (2026-10-22: `backend/app/modelo.py` · contracción K_SHRINK=8 · cúpula λ [0.2, 4.5] · grid 0..8 renormalizado · 1.252 predicciones en `prediccion` verificadas idempotentes)
 - [ ] Dixon-Coles (ajuste de empates)
 - [ ] LightGBM con features de Fase 4 (1X2)
-- [ ] Salidas: P(1/X/2) · marcadores · over/under 2.5
+- [x] Salidas: P(1/X/2) · marcadores · over/under 2.5 (prob_local/empate/visita + prob_over25/under25 + marcador_estimado + diagnostico JSONB)
 
 ## FASE 6 — MODELO DE JUGADOR *(tras MVP, en paralelo)*
 - [ ] Goles esperados/90 ajustados por posición, rival y minutos esperados + contracción

@@ -42,6 +42,8 @@ y despliegue 100% gratuito. Doble propósito:
 | 2026-10-22 | Ligas MVP: **LaLiga (PD) · Premier (PL) · Serie A (SA) · Bundesliga (BL1) · Champions (CL)** | Decisión del propietario; se ampliará a futuro. |
 | 2026-10-22 | **Europa League (EL) fuera del MVP inicial** | Confirmado con la API key real: el free tier de football-data.org solo da acceso a 13 competiciones (BSA, ELC, PL, CL, EC, FL1, BL1, SA, DED, PPL, CLI, PD, WC) y **EL no está entre ellas** (HTTP 403). Se integrará después vía API-Football (100 req/día gratis). |
 | 2026-10-22 | **Esquema Fase 3**: PKs = id de la API · tabla `clasificacion` añadida (fuente: standings) · `stats_*` usan JSONB extensible y se llenan en Fases 4-8 | El upsert por id de la API hace la carga naturalmente idempotente; los stats del free tier son flexibles; desviación bienintencionada del nombre del plano documentada |
+| 2026-10-22 | **Modelo baseline Fase 5: Poisson doble** (λ = μ·atk·dfn → grid de marcadores 0..8) | Transparente y sin dependencias; sirve de referencia contra la que medir Dixon-Coles y LightGBM; 100% walk-forward (parámetros SOLO con partidos previos al partido a predecir) |
+| 2026-10-22 | **Protecciones del Poisson**: K_SHRINK=8 (contracción de fuerzas hacia la media), fuerzas recortadas a [0.4, 2.5], cúpula λ ∈ [0.2, 4.5], masa del grid renormalizada | El producto multiplicativo explotaba con muestras pequeñas (λ 11.27 en la Champions con solo 3 fechas; P(local) 99.97%). Con protecciones: max λ 3.76, max P1 88.07% — intensidades plausibles de fútbol real |
 
 ## 4. STACK TÉCNICO
 

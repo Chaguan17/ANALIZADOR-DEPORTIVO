@@ -175,7 +175,7 @@
 - Descubrimiento honesto: `h2h_jugados=0` en jornadas 10 porque `HistoriaLiga` solo
   carga la temporada actual (Málaga ascendió; sin choques previos en la temporada)
   → limitación documentada en la sección 10 del CONTEXTO con plan de resolución.
-- Catálogo de features oficialentliche en 00_CONTEXTO.md sección 10 (grupos + claves
+- Catálogo de features oficiales en 00_CONTEXTO.md sección 10 (grupos + claves
   exactas + justificación) — requisito del ritual de la Fase 4.
 - Features de JUGADOR deferidos a Fase 6 (dato top-10 agregado, sin minutos);
   decisión marcada en el plano maestro.
@@ -188,6 +188,49 @@
    - salida: prob_local/empate/visita + prob_over25 + marcador más probable
      → primera fila en la tabla `prediccion` (modelo "poisson_doble").
 2. Después — Fase 5b LightGBM cómo alternativa; luego Fase 7 evaluation walk-forward.
+
+---
+
+## Sesión 6 · 2026-10-22 · FASE 5 — BASELINE POISSON DOBLE ✓ (1.252 predicciones sanas)
+
+**Qué se hizo:**
+- `backend/app/modelo.py` — modelo baseline Poisson doble, 100% walk-forward:
+  - `ParametrosLiga.calcular(hasta)`: μ_casa/μ_visita de liga + fuerzas atk/dfn por
+    equipo (como local / como visitante), calculadas SOLO con partidos < fecha
+  - `predecir()`: λ = μ × atk × dfn → grid Poisson 0..8 × 0..8 → P(1/X/2),
+    over/under 2.5 y marcador más probable
+  - `predecir_y_guardar()`: persistencia idempotente (delete+insert por
+    (partido, modelo) — aprovecha la UNIQUE de la tabla `prediccion`)
+- CLI: `python -m backend.app.modelo [--liga X] [--todas] [--prox N] [--guardar]`
+- Primeras predicciones vivas: Alavés 61.9% vs Málaga · Barcelona 63.2% vs Real
+  Madrid · Villarreal favorito en Mestalla (46.9%) — cifras plausibles.
+
+**Problema detectado y resuelto (lo interesante de esta fase):**
+- El Poisson crudo explotaba: λ hasta 11.27 (RB Leipzig), P(local) 99.97% y
+  marcadores 0-7 — el producto μ×atk×dfn estalla cuando ambos factores son
+  extremos y las muestras crecen poco (Champions con solo 3 fechas jugadas).
+- Protecciones aplicadas (decisiones en CONTEXTO §3):
+  1. K_SHRINK=8 — contracción de fuerzas hacia 1.0: fuerza = 1 + (cruda-1)·j/(j+K)
+  2. MIN/MAX_FUERZA 0.4/2.5 — recorte post-contracción
+  3. LAMBDA_MIN/MAX 0.2/4.5 — cúpula de goles esperados por partido
+  4. Grid 0..8 trunca las colas de Poisson → renormalización de la masa
+     (el guardián interno `assert 1X2≈1` detectó el truncamiento en la 1ª corrida)
+- Antes → después en la BD: max λ 11.27 → 3.76 · max P(local) 99.97% → 88.07% ·
+  total 1252 filas mantenido (las locas fueron reemplazadas in-situ).
+
+**Verificaciones psql:**
+- Por liga: SA 310 · PL 310 · PD 290 · BL1 252 · CL 90 = 1.252 ✓
+- Re-corrida completa `--todas --guardar` → mismas 1252 filas (idempotencia ✓)
+- Muestra con join equipos/partidos legible y plausible
+
+**Quedan abiertas de la Fase 5:** Dixon-Coles (ajusta empates/marcadores bajos
+con ρ) y LightGBM con los 31 features de Fase 4. Variantes vs baseline.
+
+**Siguientes pasos:**
+1. Fase 5b: Dixon-Coles → comparar mejora vs baseline (log loss aún sin medir)
+2. o Fase 7: evaluación walk-forward del baseline ya registrada (log loss/Brier
+   contra los partidos FINISHED recientes) → números de precisión reales
+3. Después: Fase 8 (API) ya tiene datos que servir en `prediccion`.
 
 
 
