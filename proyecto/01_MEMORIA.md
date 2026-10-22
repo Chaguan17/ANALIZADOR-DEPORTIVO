@@ -89,7 +89,8 @@
 **Hallazgos de datos reales (temp 2026-27):**
 - Ligas domésticas 20/20/20 equipos 380 partidos · BL1 18/306 · CL 36/144 (fase de liga)
 - Jornadas jugadas: PD 9 (89 FINISHED + 1 CANCELLED), PL 7, SA 7, BL1 6, CL 3 de fase de liga
-- Insumo de predicciones disponible ya: ~1.242 partidos por jugar (SCHEDULED/TIMED)
+- Insumo de predicciones disponible ya: 1.252 partidos por jugar (SCHEDULED/TIMED)
+  de 1.590 descargados en total.
 - QA captó los empates de posiciones de la tabla de Champions (puntos iguales → posiciones
   repetidas 20/20, 29/29, comportamiento real de la API) → regla de tablas ajustada a
   no-decreciente + equipos únicos.
