@@ -284,6 +284,70 @@ con ρ) y LightGBM con los 31 features de Fase 4. Variantes vs baseline.
 2. o Fase 8: API FastAPI para congelar los humildes números del baseline V1 y
    exponerlos al frontend (la historia "Baseline1 → mejoras en la versión 2").
 
+---
+
+## Sesión 8 · 2026-10-22 · FASE 5b COMPLETA (Dixon-Coles) → luego FASE 8
+
+**Qué se hizo (Fase 5b — Dixon-Coles):**
+- Refactor DRY de `modelo.py`: el grid de marcadores vive ahora en el helper
+  compartido `probabilidades_1x2(pmf_local, pmf_visita, peso=None)` — el baseline
+  usa peso=None y DC inyecta el peso τ. La demo baseline repitió los
+  λ/1X2 EXACTOS pre-refactor → la matemática no se tocó (solo reorganizada).
+- `predecir_y_guardar()` parametrizado (`predecir_fn`, `modelo`) + `rho` en el
+  JSONB de `prediccion`; `evaluacion.py` parametrizado igual (predictor + nombre
+  de modelo + ρ en `reales_vs_previsto`).
+- `backend/app/modelo_dc.py` — τ de Dixon-Coles sobre las 4 celdas bajas
+  (0-0: 1−λμρ · 0-1: 1+λρ · 1-0: 1+μρ · 1-1: 1−ρ · resto: 1, clamp ≥0),
+  ρ por liga (grid-search −0.300…0.050 paso 0.0125, minimiza log loss),
+  re-computación de filas DC desde las filas baseline (MISMAS λ),
+  CLI `--liga/--todas/--peores/--guardar/--vivas`.
+- **Bugs de camino:** KeyError en `ajustar_rho` (indexaba el grid con el
+  resultado en vez de leer la prob del resultado) → corregido.
+- **HALLAZGO QUIRÚRGICO CON CONFIRMACIÓN ALGEBRAICA:** P(1|λ)·P(1|μ) = λμ·w00,
+  P(0,1) = μ·w00, P(1,0) = λ·w00 ⇒ Δmasa = ρ(−λμw00 + λμw00 + λμw00 − λμw00) = 0
+  EXACTO. Las 4 celdas τ viven dentro del bloque under-2.5 y conservan su masa →
+  **τ reordena la 1X2 pero NO mueve over/under 2.5** (comprobado al 15º decimal).
+  La mejora del O2.5 tendrá que venir por otro camino (más features/LightGBM).
+
+**Resultados honestos (temporada 2026, 323 partidos, mismas λ):**
+| Liga | ρ elegida | log loss base→DC | Brier base→DC | accuracy base→DC |
+|---|---|---|---|---|
+| PD  | −0.2125 | 1.0521→1.0457 ✅ | 0.6336→0.6299 ✅ | 48.3%→48.3% ➖ |
+| PL  | −0.0875 | 1.1588→1.1574 ✅ | 0.6972→0.6939 ✅ | 35.3%→35.3% ➖ |
+| SA  | +0.0500 | 1.0675→1.0616 ✅ | 0.6448→0.6417 ✅ | 39.7%→36.8% ❌ |
+| BL1 | +0.0500 | 1.0524→1.0516 ✅ | 0.6292→0.6298 ❌ | 50.0%→50.0% ➖ |
+| CL  | +0.0500 | 0.9630→0.9587 ✅ | 0.5748→0.5729 ✅ | 55.8%→55.8% ➖ |
+| TOTAL | — | 1.0635→1.0594 ✅ | 0.6392→0.6367 ✅ | 45.2%→44.6% ❌ |
+
+**Lecturas honestas:**
+- DC mejora el LOG LOSS en 5/5 ligas y el Brier en el total — la métrica
+  probabilística (la correcta) mejora consistentemente aunque el margen es
+  pequeño (−0.004). Accuracy fluctúa ±0.6% (métrica grosera ante cambios
+  probabilísticos finos; en SA re-ordena 2 favoritos).
+- ρ por liga cuenta historia: PD/PL negativa (les faltaban empates bajos al
+  modelo), SA/BL1/CL pegadas al borde +0.05 (sobra confianza en marcadores
+  bajos). Con 48-87 partidos por liga, el ruido in-sample manda — la señal
+  fuerte llegará con historia multi-temporada.
+- Las predicciones vivas DC la muestran a simple vista: Alavés-Málaga pasó de
+  61.9%/21.5%/16.6% a 59.7%/25.9%/14.4% (menos seguro del favorito, más empate).
+- Honesto total: Dixon-Coles es un PULIDO marginal, no un salto. Su papel real
+  en el proyecto: técnica canónica implementada bien + comparación replicable
+  contra la que medir LightGBM.
+
+**Verificaciones:**
+- SQL puro: 1252 + 1252 en `prediccion` (por modelo), 323 + 323 evaluaciones,
+  log loss/Brier/accuracy idénticos a lo impreso, ρ por liga guardada en JSONB.
+- Idempotencia: re-corrida PD → 87 evaluations (no 174), 646 total, 1252 vivas.
+
+**Estado BD tras Fase 5b:** 1.590 partidos · 2.504 predicciones (2 modelos × 1252)
+· 646 evaluaciones (2 modelos × 323) · fixture de ρ: PD −0.2125, PL −0.0875,
+SA/BL1/CL +0.05.
+
+**Siguientes pasos:**
+1. FASE 8: API FastAPI sirviendo AMBOS modelos (endpoints /predictions,
+   /model-accuracy ya comparan por modelo).
+2. Después: LightGBM (Fase 5c) o frontend (Fase 9) o CI (Fase 10).
+
 
 
 

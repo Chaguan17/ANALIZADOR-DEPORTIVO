@@ -57,8 +57,17 @@ def _resultado_de(goles_local: int, goles_visitante: int) -> str:
     return "visita"
 
 
-def evaluar_liga(liga: str, temporada: int) -> tuple[list[dict], int]:
-    """Evalúa TODOS los partidos FINISHED de la liga; devuelve (filas, saltados)."""
+def evaluar_liga(
+    liga: str,
+    temporada: int,
+    predecir_fn=None,
+) -> tuple[list[dict], int]:
+    """Evalúa TODOS los partidos FINISHED de la liga; devuelve (filas, saltados).
+
+    `predecir_fn` permite inyectar otra variante de modelo (p. ej. Dixon-Coles con
+    su ρ ajustada); por defecto usa el baseline `predecir()`.
+    """
+    predecir_el = predecir_fn or predecir
     historia = HistoriaLiga(liga, temporada)
     with SessionLocal() as session:
         partidos = (
@@ -85,7 +94,7 @@ def evaluar_liga(liga: str, temporada: int) -> tuple[list[dict], int]:
             saltados += 1
             continue
 
-        pr = predecir(historia, p.id_local, p.id_visitante, p.utc_date)
+        pr = predecir_el(historia, p.id_local, p.id_visitante, p.utc_date)
         probs = {
             "local": float(pr["pro_local"]),
             "empate": float(pr["pro_empate"]),
@@ -121,6 +130,7 @@ def evaluar_liga(liga: str, temporada: int) -> tuple[list[dict], int]:
                 "acierto_o25": (float(pr["pro_over25"]) > 0.5) == over_real,
                 "brier_o25": brier_o25,
                 "mae_goles": mae_goles,
+                "rho": pr.get("rho"),  # solo la lleva Dixon-Coles (None en baseline)
             }
         )
     return filas, saltados
@@ -144,8 +154,13 @@ def _agregar(filas: list[dict]) -> dict | None:
     }
 
 
-def _imprimir_resumen(titulo: str, agg: dict, saltados: int) -> None:
-    print(f"\n────────── {titulo} · {NOMBRE_MODELO} ──────────")
+def _imprimir_resumen(
+    titulo: str,
+    agg: dict,
+    saltados: int,
+    etiqueta: str = NOMBRE_MODELO,
+) -> None:
+    print(f"\n────────── {titulo} · {etiqueta} ──────────")
     print(
         f"  Partidos evaluados: {agg['n']}"
         f"   (saltados sin evidencia previa: {saltados})"
@@ -202,14 +217,14 @@ def tabla_calibracion(filas: list[dict]) -> None:
             print(f"  {i*10:>3}-{i*10+10:<6}{''.join(f'{x:<22}' for x in celdas)}")
 
 
-def _persistir(filas: list[dict]) -> int:
+def _persistir(filas: list[dict], modelo: str = NOMBRE_MODELO) -> int:
     """Guarda las evaluaciones en reales_vs_previsto (delete+insert idempotente)."""
     if not filas:
         return 0
     with SessionLocal.begin() as session:
         session.execute(
             sa_delete(RealesVsPrevisto).where(
-                RealesVsPrevisto.modelo == NOMBRE_MODELO,
+                RealesVsPrevisto.modelo == modelo,
                 RealesVsPrevisto.partido_id_api.in_(
                     [f["partido"].id_api for f in filas]
                 ),
@@ -220,7 +235,7 @@ def _persistir(filas: list[dict]) -> int:
             session.add(
                 RealesVsPrevisto(
                     partido_id_api=p.id_api,
-                    modelo=NOMBRE_MODELO,
+                    modelo=modelo,
                     acierto_1x2=f["acierto"],
                     brier_score=f["brier"],
                     log_loss=f["log_loss"],
@@ -238,6 +253,7 @@ def _persistir(filas: list[dict]) -> int:
                         "goles_reales": [p.goles_local, p.goles_visitante],
                         "over25_real": f["over_real"],
                         "acierto_over25": f["acierto_o25"],
+                        "rho": f.get("rho"),  # solo la lleva Dixon-Coles
                     },
                 )
             )

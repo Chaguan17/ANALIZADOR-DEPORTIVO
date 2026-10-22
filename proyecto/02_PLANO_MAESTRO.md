@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22 (Sesión 7)
+> Última actualización: 2026-10-22 (Sesión 8)
 
 ---
 
@@ -42,7 +42,7 @@
 
 ## FASE 5 — MODELO DE EQUIPO
 - [x] Baseline: Poisson doble (marcadores esperados local/visita) (2026-10-22: `backend/app/modelo.py` · contracción K_SHRINK=8 · cúpula λ [0.2, 4.5] · grid 0..8 renormalizado · 1.252 predicciones en `prediccion` verificadas idempotentes)
-- [ ] Dixon-Coles (ajuste de empates)
+- [x] Dixon-Coles (ajuste de marcadores bajos) (2026-10-22: `backend/app/modelo_dc.py` · τ sobre las 4 celdas 0-0/1-0/0-1/1-1 · ρ por liga grid-search −0.300..0.050 · mismas λ que baseline · evaluaciones DC coexisten por modelo='poisson_dc' · log loss 5/5 ligas mejor, total 1.0635→1.0594 · hallazgo: τ NO toca O2.5, invariante algebraico)
 - [ ] LightGBM con features de Fase 4 (1X2)
 - [x] Salidas: P(1/X/2) · marcadores · over/under 2.5 (prob_local/empate/visita + prob_over25/under25 + marcador_estimado + diagnostico JSONB)
 

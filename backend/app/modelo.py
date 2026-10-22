@@ -68,6 +68,58 @@ def _cupir_lambda(lam: float) -> float:
     return min(max(lam, LAMBDA_MIN), LAMBDA_MAX)
 
 
+def probabilidades_1x2(
+    pmf_local: list[float],
+    pmf_visita: list[float],
+    peso=None,
+) -> dict:
+    """Grid de marcadores (0..MAX)² → distribución completa 1X2.
+
+    `peso(i, j)` (opcional) repondera cada celda — es la puerta de entrada de
+    Dixon-Coles (modelo_dc.py): la Poisson independiente pesa mal los marcadores
+    bajos (0-0/1-0/0-1/1-1). Con peso=None sirve el Poisson doble puro.
+    El grid trunca las colas (marcadores 9+) → renormalizamos repartiendo esa masa.
+    """
+    pro_local = pro_empate = pro_visita = 0.0
+    pro_under25 = 0.0
+    mejor_marca = (0, 0)
+    mejor_pro = 0.0
+    for i, pl in enumerate(pmf_local):
+        for j, pv in enumerate(pmf_visita):
+            p = pl * pv
+            if peso is not None:
+                p *= peso(i, j)
+            if i > j:
+                pro_local += p
+            elif i == j:
+                pro_empate += p
+            else:
+                pro_visita += p
+            if i + j <= 2:
+                pro_under25 += p
+            if p > mejor_pro:
+                mejor_pro, mejor_marca = p, (i, j)
+
+    masa_grid = pro_local + pro_empate + pro_visita
+    pro_local /= masa_grid
+    pro_empate /= masa_grid
+    pro_visita /= masa_grid
+    pro_under25 /= masa_grid
+
+    total = pro_local + pro_empate + pro_visita
+    assert abs(total - 1.0) < 1e-9, f"1X2 no suma 1 tras renormalizar: {total!r}"  # guardián
+
+    return {
+        "pro_local": pro_local,
+        "pro_empate": pro_empate,
+        "pro_visita": pro_visita,
+        "pro_over25": 1.0 - pro_under25,
+        "pro_under25": pro_under25,
+        "marcador_estimado": f"{mejor_marca[0]}-{mejor_marca[1]}",
+        "masa_grid": masa_grid,
+    }
+
+
 class ParametrosLiga:
     """Fuerzas de ataque/ defensa + medias de liga, calculadas SOLO con partidos < fecha."""
 
@@ -159,53 +211,18 @@ def predecir(
 
     pmf_l = _pmf_poisson(lam_local)
     pmf_v = _pmf_poisson(lam_visita)
-
-    pro_local = pro_empate = pro_visita = 0.0
-    pro_under25 = 0.0
-    mejor_marca = (0, 0)
-    mejor_pro = 0.0
-    for i, pl in enumerate(pmf_l):
-        for j, pv in enumerate(pmf_v):
-            p = pl * pv
-            if i > j:
-                pro_local += p
-            elif i == j:
-                pro_empate += p
-            else:
-                pro_visita += p
-            if i + j <= 2:
-                pro_under25 += p
-            if p > mejor_pro:
-                mejor_pro, mejor_marca = p, (i, j)
-
-    # El grid 0..MAX trunca las colas de Poisson (marcadores 9+): renormalizamos
-    # repartiendo esa cola → las probabilidades vuelven a sumar exactamente 1.
-    masa_grid = pro_local + pro_empate + pro_visita
-    pro_local /= masa_grid
-    pro_empate /= masa_grid
-    pro_visita /= masa_grid
-    pro_under25 /= masa_grid
-    pro_over25 = 1.0 - pro_under25
-
-    total = pro_local + pro_empate + pro_visita
-    assert abs(total - 1.0) < 1e-9, f"1X2 no suma 1 tras renormalizar: {total!r}"  # guardián
+    grid = probabilidades_1x2(pmf_l, pmf_v)
 
     return {
         "lam_local": lam_local,
         "lam_visita": lam_visita,
-        "pro_local": pro_local,
-        "pro_empate": pro_empate,
-        "pro_visita": pro_visita,
-        "pro_over25": pro_over25,
-        "pro_under25": pro_under25,
-        "marcador_estimado": f"{mejor_marca[0]}-{mejor_marca[1]}",
+        **grid,
         "mu_casa": params["mu_casa"],
         "mu_visita": params["mu_visita"],
         "atk_casa_local": params["atk_casa"].get(id_local, 1.0),
         "dfn_fuera_visita": params["dfn_fuera"].get(id_visitante, 1.0),
         "atk_fuera_visita": params["atk_fuera"].get(id_visitante, 1.0),
         "dfn_casa_local": params["dfn_casa"].get(id_local, 1.0),
-        "masa_grid": masa_grid,
         "datos": params["partidos_hasta"],  # nº de partidos usados como evidencia
     }
 
@@ -215,12 +232,19 @@ def predecir_y_guardar(
     partidos_pendientes: list,
     nombres: dict[int, str],
     guardar: bool = False,
+    predecir_fn=None,
+    modelo: str = NOMBRE_MODELO,
 ) -> tuple[list[dict], int]:
-    """Predice una lista de partidos (ya filtrados por liga) y opcionalmente los persiste."""
+    """Predice una lista de partidos (ya filtrados por liga) y opcionalmente los persiste.
+
+    `predecir_fn` permite inyectar otra variante (p. ej. Dixon-Coles con su ρ por liga);
+    por defecto usa el baseline `predecir()`.
+    """
+    predecir_el = predecir_fn or predecir
     historia = HistoriaLiga(liga, partidos_pendientes[0].temporada if partidos_pendientes else 0)
     resultados: list[dict] = []
     for p in partidos_pendientes:
-        pr = predecir(historia, p.id_local, p.id_visitante, p.utc_date)
+        pr = predecir_el(historia, p.id_local, p.id_visitante, p.utc_date)
         pr["partido"] = p
         resultados.append(pr)
 
@@ -232,7 +256,7 @@ def predecir_y_guardar(
                     Prediccion.partido_id_api.in_(
                         [r["partido"].id_api for r in resultados]
                     ),
-                    Prediccion.modelo == NOMBRE_MODELO,
+                    Prediccion.modelo == modelo,
                 )
             )
             for r in resultados:
@@ -240,7 +264,7 @@ def predecir_y_guardar(
                 session.add(
                     Prediccion(
                         partido_id_api=p.id_api,
-                        modelo=NOMBRE_MODELO,
+                        modelo=modelo,
                         prob_local=r["pro_local"],
                         prob_empate=r["pro_empate"],
                         prob_visita=r["pro_visita"],
@@ -262,6 +286,7 @@ def predecir_y_guardar(
                             "dfn_casa_local": r["dfn_casa_local"],
                             "partidos_evidencia": r["datos"],
                             "masa_grid": r["masa_grid"],
+                            "rho": r.get("rho"),  # solo Dixon-Coles la lleva
                         },
                     )
                 )
