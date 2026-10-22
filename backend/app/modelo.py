@@ -287,6 +287,7 @@ def predecir_y_guardar(
                             "partidos_evidencia": r["datos"],
                             "masa_grid": r["masa_grid"],
                             "rho": r.get("rho"),  # solo Dixon-Coles la lleva
+                            "mezcla_uniforme": r.get("mezcla_uniforme"),  # solo LightGBM
                         },
                     )
                 )

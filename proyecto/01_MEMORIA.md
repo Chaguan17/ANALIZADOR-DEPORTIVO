@@ -379,6 +379,93 @@ SA/BL1/CL +0.05.
    ya devuelven AMBOS modelos).
 2. o Fase 10 CI primero (ruff/pytest/build) para blindar antes de crecer.
 
+## Sesión 9 · 2026-10-22 · FASE 5c COMPLETA (LightGBM con features de Fase 4)
+
+**Qué se hizo:**
+- lightgbm 4.7.0 instalado y fijado en `backend/requirements.txt` (llegó con
+  numpy 2.5.4 y scipy 1.18.1; se usa la API RAW — `lgb.train`/`booster.predict`
+  — para NO depender de scikit-learn; el output multiclase siempre es (n, 3)
+  con columnas 0=local, 1=empate, 2=visita).
+- `backend/app/modelo_lgbm.py`: el árbol aprende de las 31 features walk-forward
+  de la Fase 4 (`features_de_partido` — forma ventana-5, casa/fuera, descanso,
+  tabla snapshot, H2H), sin ninguna estructura de fútbol a mano (no hay μ, ni
+  atk/dfn, ni τ). LightGBM trata los None del arranque frío como missing nativo.
+  Parámetros diminutos para datos diminutos: 60 árboles · lr 0.08 · num_leaves 7
+  · max_depth 3 · min_data_in_leaf 6 · feature_fraction 0.8 · seed 42.
+- Protocolo walk-forward IDÉNTICO a Fases 7/5b (cada fila entrenante lleva sus
+  features computadas a la fecha de CADA uno) + calentamiento reforzado:
+  MIN_EVIDENCIA=2 **y** las 3 clases presentes en el pool entrenante (si nunca
+  hubo empate, la salida 3-clases no está definida) → saltados 46 vs 14 del
+  baseline, contados y presentados tal cual.
+- **HALLAZGO CENTRAL (la corrida cruda didáctica):** LightGBM puro fue
+  SOBRECONFIADO CATASTRÓFICO en datos pequeños. PD: accuracy 32.5% (¡peor que
+  el azar!), log loss 1.6013 (peor que la uniforme 1.0986), Brier 0.8655, con
+  fallos caros tipo "local 99%" (Celta 0-2 Athletic, log loss 6.09). Con 54-89
+  filas por liga, los árboles memorizan hojas puras en vez de generalizar —
+  la regularización ESTRUCTURAL del Poisson (K_SHRINK) es lo que el árbol no
+  puede darse a sí mismo.
+- **La cura v1: mezcla con la uniforme** `p = w·p_árbol + (1−w)/3`, w por liga
+  grid-search 0.00…1.00 paso 0.05 minimizando el log loss walk-forward — el
+  análogo EXACTO del K_SHRINK, mismo matiz in-sample de 1 parámetro que la ρ
+  de DC (documentado). El w elegido MIDE honestamente cuánta señal tiene el
+  árbol en cada liga.
+- Formato HONESTO: LightGBM v1 emite SOLO P(1X2) → goles_esperados,
+  prob_over25/under25 y marcador quedan NULL en las 1.252 vivas (comprobado en
+  BD: 1252/1252 nulos). Fabricar un Poisson encima del árbol sería doble
+  modelo disfrazado.
+- `mezcla_uniforme` añadida al JSONB de `prediccion` (en
+  `modelo.py::predecir_y_guardar`) y de `reales_vs_previsto` (en
+  `evaluacion.py::_persistir`); `partidos_evidencia` = nº de FINISHED con que
+  se entrenó el árbol. `_agregar` de `evaluacion.py` hecha None-tolerante (los
+  agregados promedian solo lo que el modelo emite).
+
+**Resultados honestos (temporada 2026, walk-forward):**
+| Liga | w elegido | log loss base → LGBM | Brier base → LGBM | accuracy base → LGBM |
+|---|---|---|---|---|
+| PD  | 0.10 | 1.0521→1.0968 ❌ | 0.6336→0.6656 ❌ | 48.3%→32.5% ❌ |
+| PL  | 0.15 | 1.1588→1.0870 ✅ | 0.6972→0.6585 ✅ | 35.3%→41.0% ✅ |
+| SA  | 0.35 | 1.0675→1.0596 ✅ | 0.6448→0.6424 ✅ | 39.7%→43.3% ✅ |
+| BL1 | 0.00 | 1.0524→1.0986 ❌ (=uniforme pura) | 0.6292→0.6667 ❌ | 50.0%→45.2% ❌ |
+| CL  | 0.40 | 0.9630→1.0449 ❌ | 0.5748→0.6296 ❌ | 55.8%→46.3% ❌ |
+| TOTAL | — | 1.0635→1.0791 ❌ (n 323 vs 291) | 0.6392→0.6539 ❌ | 45.2%→40.5% ❌ |
+
+**Lecturas honestas:**
+- Con 1 temporada, el baseline estructural GANA el torneo: total 1.0635 vs
+  1.0791. Pero el cuadro NO es vergüenza, es diagnóstico: el árbol gana en
+  Premier y Serie A — justamente las 2 ligas donde el Poisson era MÁS DÉBIL
+  (PL tenía el peor log loss del baseline, 1.1588) — y declara su propia
+  nulidad en BL1 (w=0.00 → probabilidades 33.3/33.3/33.3 honestas).
+- La jerarquía de w (0.40 CL, 0.35 SA, 0.15 PL, 0.10 PD, 0.00 BL1) es la
+  señal de cuánta regularización necesita cada liga.
+- La señal fuerte llegaría con historia multi-temporada (más filas, menos
+  memorización) — límite de free tier ya documentado, no ya hoy.
+- La mezcla contiene el daño: peor fallo de PD bajó de log loss 6.09 (crudo)
+  a 1.20 (mezclado) — el techo del sobreconfiado desapareció.
+
+**Verificaciones:**
+- SQL puro: `prediccion` 1252×3 modelos (3756 filas) · `reales_vs_previsto`
+  323+323+291 · tabla por modelo: poisson_dc 1.0594 < poisson_doble 1.0635 <
+  lightgbm_v1 1.0791 (campeón siempre el estructural, con sets de n distintos).
+- NULLs honestos: goles_esperados/prob_over25/marcador = 1252/1252 nulos en
+  lightgbm_v1; w y partidos_evidencia presentes en el JSONB (PD: evid 89, w 0.1).
+- Idempotencia: re-corrida PD (`--vivas`) → lightgbm_v1 sigue 1252 (upsert, sin
+  duplicados); total evaluaciones sigue 937 filas totales.
+- Baseline intacto: `evaluar_liga` recomputada por modelo_lgbm.main dio EXACTOS
+  los números de Fase 7 (PD 48.3%/1.0521/0.6336 · total 1.0635/0.6392).
+- Fallos de camino corregidos durante la sesión: línea fantasma en el primer
+  borrador; f-string con ``f "..."`` (espacio inválido); `_agregar` sin
+  tolerancia a None (crasheaba con acierto_o25 None); subtotal de TOTAL
+  imprimiendo los saltados del LGBM en el baseline.
+
+**Estado BD tras Fase 5c:** 1.590 partidos · 3.756 predicciones (3 modelos ×
+1252) · 937 evaluaciones (323+323+291) · fixture de w: PD 0.10, PL 0.15,
+SA 0.35, BL1 0.00, CL 0.40.
+
+**Siguientes pasos:**
+1. Fase 9: frontend Next.js — la API ya sirve el 3er modelo por la clasificación
+   UNIQUE (partido, modelo); probar /fixtures devolverá los 3.
+2. o Fase 10: CI (ruff/pytest/build) para blindar antes de crecer.
+
 
 
 

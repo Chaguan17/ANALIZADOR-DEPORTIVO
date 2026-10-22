@@ -137,20 +137,30 @@ def evaluar_liga(
 
 
 def _agregar(filas: list[dict]) -> dict | None:
-    """Agregados promedio de una lista de filas evaluadas."""
+    """Agregados promedio de una lista de filas evaluadas.
+
+    Tolerante a None: los modelos que no emiten cierto output (LightGBM v1 no
+    da over/under ni λ) promedian solo sobre lo que existe; si nada existe,
+    el agregado queda None y cada CLI decide cómo mostrarlo.
+    """
     n = len(filas)
     if n == 0:
         return None
+
+    def media(clave: str) -> float | None:
+        valores = [f[clave] for f in filas if f.get(clave) is not None]
+        return sum(valores) / len(valores) if valores else None
+
     return {
         "n": n,
         "accuracy": sum(f["acierto"] for f in filas) / n,
         "baseline_local": sum(f["real"] == "local" for f in filas) / n,
-        "log_loss": sum(f["log_loss"] for f in filas) / n,
-        "brier": sum(f["brier"] for f in filas) / n,
-        "accuracy_o25": sum(f["acierto_o25"] for f in filas) / n,
+        "log_loss": media("log_loss"),
+        "brier": media("brier"),
+        "accuracy_o25": media("acierto_o25"),
         "baseline_over": sum(f["over_real"] for f in filas) / n,
-        "brier_o25": sum(f["brier_o25"] for f in filas) / n,
-        "mae_goles": sum(f["mae_goles"] for f in filas) / n,
+        "brier_o25": media("brier_o25"),
+        "mae_goles": media("mae_goles"),
     }
 
 
@@ -254,6 +264,7 @@ def _persistir(filas: list[dict], modelo: str = NOMBRE_MODELO) -> int:
                         "over25_real": f["over_real"],
                         "acierto_over25": f["acierto_o25"],
                         "rho": f.get("rho"),  # solo la lleva Dixon-Coles
+                        "mezcla_uniforme": f.get("mezcla_uniforme"),  # solo LightGBM
                     },
                 )
             )

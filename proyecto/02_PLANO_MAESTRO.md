@@ -43,8 +43,8 @@
 ## FASE 5 — MODELO DE EQUIPO
 - [x] Baseline: Poisson doble (marcadores esperados local/visita) (2026-10-22: `backend/app/modelo.py` · contracción K_SHRINK=8 · cúpula λ [0.2, 4.5] · grid 0..8 renormalizado · 1.252 predicciones en `prediccion` verificadas idempotentes)
 - [x] Dixon-Coles (ajuste de marcadores bajos) (2026-10-22: `backend/app/modelo_dc.py` · τ sobre las 4 celdas 0-0/1-0/0-1/1-1 · ρ por liga grid-search −0.300..0.050 · mismas λ que baseline · evaluaciones DC coexisten por modelo='poisson_dc' · log loss 5/5 ligas mejor, total 1.0635→1.0594 · hallazgo: τ NO toca O2.5, invariante algebraico)
-- [ ] LightGBM con features de Fase 4 (1X2)
-- [x] Salidas: P(1/X/2) · marcadores · over/under 2.5 (prob_local/empate/visita + prob_over25/under25 + marcador_estimado + diagnostico JSONB)
+- [x] LightGBM con features de Fase 4 (1X2) (2026-10-22: `backend/app/modelo_lgbm.py` · API raw sin scikit-learn · 31 features walk-forward · walk-forward con calentamiento reforzado (MIN_EVIDENCIA + 3 clases en el pool) · primera corrida del árbol puro SOBRECONFIADA (PD log loss 1.6013, accuracy 32.5%) → v1 = mezcla con la uniforme w por liga (grid 0.00…1.00 paso 0.05, análogo del K_SHRINK) · total 1.0791 vs baseline 1.0635, GANA en PL (1.0870 vs 1.1588) y SA (1.0596 vs 1.0675), w=0.00 en BL1 (uniforme pura) · λ/O2.5/marcador NULL honestos en BD · evaluaciones 'lightgbm_v1' 291 + vivas 1252 coexisten)
+- [x] Salidas: P(1/X/2) · marcadores · over/under 2.5 (prob_local/empate/visita + prob_over25/under25 + marcador_estimado + diagnostico JSONB) — nota: LightGBM v1 cubre SOLO la P(1/X/2); sus O2.5/marcador quedan NULL por diseño honesto
 
 ## FASE 6 — MODELO DE JUGADOR *(tras MVP, en paralelo)*
 - [ ] Goles esperados/90 ajustados por posición, rival y minutos esperados + contracción
