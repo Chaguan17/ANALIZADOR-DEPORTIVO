@@ -87,19 +87,21 @@ ANALIZADOR DEPORTIVO/
 
 ## 8. FUENTES DE DATOS
 
-- **Principal:** football-data.org → competiciones/partidos/clasificación/plantillas/goleadores
+- **Principal:** football-data.org → competiciones/partidos/clasificación/plantillas y goleadores
 - **Ligas del MVP (verificado con la API key real, 2026-10-22):** LaLiga `PD` ✅ · Premier `PL` ✅ ·
   Serie A `SA` ✅ · Bundesliga `BL1` ✅ · Champions `CL` ✅ · **Europa League `EL` ❌ fuera del free tier**
   → se agregará después vía API-Football
 - Free tier disponible además para: Brasileirão `BSA`, Championship `ELC`, Eurocopa `EC`, Ligue 1 `FL1`,
   Eredivisie `DED`, Primeira Liga `PPL`, Libertadores `CLI`, Mundial `WC`
+- **Limitación conocida del free tier:** goleadores solo con los **10 mejores por liga**
+  (listas completas: FBref/Understat en la Fase 6)
 - **Respaldo para jugadores (Fase 6):** FBref / Understat (CSV o scraping puntual)
-- **Límites:** 10 peticiones/minuto en el tier gratuito → todos los datos se persisten en Postgres;
-  nunca se pide a la API lo que ya está guardado.
+- **Límites:** 10 peticiones/minuto en el tier gratuito → todos los datos se persisten en disco crudo
+  y luego en Postgres; nunca se pide a la API lo que ya está guardado (caché-first).
 
 ## 9. PENDIENTE POR DECIDIR
 
 - [x] ~~Liga(s) objetivo del MVP~~ → decidido y **verificado contra la API real** 2026-10-22: PD, PL, SA, BL1, CL · EL queda fuera del free tier (se integrará vía API-Football)
 - [x] API key de football-data.org funcionando (guardada en `.env` local, fuera de Git)
-- [ ] Nombre final del repo en GitHub (remoto conectado más adelante, decisión del propietario)
+- [x] Repositorio GitHub conectado: `github.com/Chaguan17/ANALIZADOR-DEPORTIVO` (2026-10-22)
 - [ ] Licencia (MIT recomendado si es público)

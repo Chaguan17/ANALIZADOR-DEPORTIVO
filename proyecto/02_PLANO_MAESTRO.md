@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22 (Sesión 2)
+> Última actualización: 2026-10-22 (Sesión 3)
 
 ---
 
@@ -18,14 +18,15 @@
 - [x] `README.md` (cara del portafolio) + `.gitignore` + `.env.example`
 - [x] `docker-compose.yml` (Postgres local para desarrollo)
 - [x] `git init` (rama `main`) + primer commit (2026-10-22)
-- [ ] Conectar remoto GitHub y hacer push (requiere el nombre del repo con el propietario)
+- [x] Conectar remoto GitHub y push — `github.com/Chaguan17/ANALIZADOR-DEPORTIVO` (2026-10-22)
 - [ ] Badges de CI/CD en README (cuando existan los workflows)
 
 ## FASE 2 — INGESTA DE DATOS (football-data.org)
-- [x] Cuenta + API key de football-data.org — **creada y verificada contra la API real** (2026-10-22); guardada en `.env` local ✅ · *pendiente: GitHub Secrets cuando exista el repo remoto*
-- [ ] Cliente de API con rate-limit (10 req/min), reintentos y JSON crudo en `pipeline/raw/`
-- [ ] Endpoints: partidos (todos por temporada), clasificación, plantillas, goleadores
-- [ ] Ligas objetivo: **PD ✅ · PL ✅ · SA ✅ · BL1 ✅ · CL ✅** (2026-10-22) · EL ❌ fuera del free tier → deferida a API-Football
+- [x] Cuenta + API key de football-data.org — **creada y verificada contra la API real** (2026-10-22); guardada en `.env` local ✅ · *pendiente: GitHub Secrets cuando exista el repo remoto → repo creado 2026-10-22; secrets se añaden al crear workflows (Fase 10-12)*
+- [x] Cliente de API con rate-limit (10 req/min), reintentos y JSON crudo en `pipeline/raw/` (2026-10-22: `pipeline/client.py` con pacing + backoff + caché-first)
+- [x] Endpoints: partidos (season fija 2026), clasificación, equipos, goleadores (2026-10-22: 5 ligas × 4 fuentes = 20 requests OK; **goleadores limitados a top-10 por el free tier**; PD tiene 1 partido CANCELLED a headlights)
+- [x] Ligas objetivo: **PD ✅ · PL ✅ · SA ✅ · BL1 ✅ · CL ✅** (2026-10-22) · EL ❌ fuera del free tier → deferida a API-Football
+- [x] QA de datos crudos sin gasto de cuota (2026-10-22: `pipeline/qa.py`, 24 archivos válidos, 0 problemas)
 
 ## FASE 3 — BASE DE DATOS POSTGRES
 - [ ] Esquema: `equipos`, `jugadores`, `partidos`, `stats_partido`, `stats_jugador`, `predicciones`, `reales_vs_previsto`
