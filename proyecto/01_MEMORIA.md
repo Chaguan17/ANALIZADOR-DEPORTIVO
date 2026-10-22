@@ -149,5 +149,46 @@
 3. Ritual de datos: tras semana nueva de partidos → `python -m pipeline` + `python -m backend.app.load`
    (futuro: solo se añade lo nuevo gracias a caché + upsert).
 
+---
+
+## Sesión 5 · 2026-10-22 · FASE 4 COMPLETA (features de equipos + verificación cruzada)
+
+**Qué se hizo:**
+- `backend/app/features.py` — motor de features con regla de oro walk-forward:
+  - `HistoriaLiga`: partidos FINISHED de una liga-temporada ordenados por fecha (desde Postgres)
+  - `forma()` ventana N=5 (puntos/gf/gc), con filtro como local o como visitante
+  - `snapshot_tabla()` clasificación RECOMPUTADA punto-en-tiempo (la tabla de la API es
+    del presente y podría filtrar futuro en backtesting — por eso no se sirve de ella)
+  - `h2h()` últimos N=6 entre ambos equipos
+  - `ultimo_antes()` → descanso en días
+  - `features_de_partido()` → dict con las 31 claves del catálogo
+- CLI demo: `python -m backend.app.features --liga PD --prox 2` → primer próximo partido
+  Alavés vs Málaga (jornada 10) con sus 31 features impresos.
+- **Verificación cruzada doble-camino:** misma métrica calculada por SQL puro dentro
+  del contenedor (psql ventana LIMIT 5) y por features.py → coincidencia exacta
+  (Alavés: pts5=1, gf5=3, gc5=7, j=5). QA de features PASADO.
+
+**Decisiones/problemas de esta sesión:**
+- Bug captado en autorrevisión: en snapshot_tabla, los puntos del visitante se
+  derivaban con `3 - p_local` (empate daría 2 en vez de 1) → corregido con
+  `_puntos_de(r, id_visitante)`.
+- Descubrimiento honesto: `h2h_jugados=0` en jornadas 10 porque `HistoriaLiga` solo
+  carga la temporada actual (Málaga ascendió; sin choques previos en la temporada)
+  → limitación documentada en la sección 10 del CONTEXTO con plan de resolución.
+- Catálogo de features oficialentliche en 00_CONTEXTO.md sección 10 (grupos + claves
+  exactas + justificación) — requisito del ritual de la Fase 4.
+- Features de JUGADOR deferidos a Fase 6 (dato top-10 agregado, sin minutos);
+  decisión marcada en el plano maestro.
+
+**Siguientes pasos:**
+1. **FASE 5 — modelo de equipo (baseline Poisson doble):**
+   - estimar fuerza de ataque/defensa por equipo a partir de goles históricos
+     (features ya calculadas: gf_prom_casa/fuera, gc_prom...),
+   - distribuir marcadores (0-0 … 6-6) con Poisson ajustando la ventaja de jugar en casa,
+   - salida: prob_local/empate/visita + prob_over25 + marcador más probable
+     → primera fila en la tabla `prediccion` (modelo "poisson_doble").
+2. Después — Fase 5b LightGBM cómo alternativa; luego Fase 7 evaluation walk-forward.
+
+
 
 

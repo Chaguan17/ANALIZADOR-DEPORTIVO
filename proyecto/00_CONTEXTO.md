@@ -106,3 +106,29 @@ ANALIZADOR DEPORTIVO/
 - [x] API key de football-data.org funcionando (guardada en `.env` local, fuera de Git)
 - [x] Repositorio GitHub conectado: `github.com/Chaguan17/ANALIZADOR-DEPORTIVO` (2026-10-22)
 - [ ] Licencia (MIT recomendado si es público)
+
+---
+
+## 10. CATÁLOGO DE FEATURES — EQUIPOS (Fase 4)
+
+Fuente de código: `backend/app/features.py` · Regla de oro: **walk-forward**
+(un feature para el partido X usa SOLO partidos con fecha < X; sin filtración de futuro).
+
+| Grupo | Features (claves exactas) | Justificación |
+|---|---|---|
+| Forma (ventana 5) | `forma_pts5_local/visita`, `forma_gf5_local/visita`, `forma_gc5_local/visita`, `forma_j5_local/visita` | Puntos, goles a favor y en contra de los últimos 5 partidos: mide momentum reciente (la tabla acumula, la forma pesa hoy) |
+| Condición casa/fuera | `ppg_casa_local`, `gf_prom_casa_local`, `gc_prom_casa_local`, `j_casa_local`, `ppg_fuera_visita`, `gf_prom_fuera_visita`, `gc_prom_fuera_visita`, `j_fuera_visita` | Media de PPG/goles como local del equipo local y como visitante del visitante: la ventaja de campo es una de las anomalías más robustas del fútbol |
+| Descanso | `descanso_local`, `descanso_visita` | Días desde su último partido: calendario congestionado y daño(sentencia resistencia). |
+| Tabla snapshot | `pos_local`, `pos_visita`, `tabla_pts_local/visita`, `tabla_dg_local/visita`, `tabla_j_local/visita` | Clasificación RECOMPUTADA punto-en-tiempo (solo partidos previos; la `Clasificacion` de la API es un snapshot del presente y NO sirve para backtesting) |
+| historial directo (H2H) | `h2h_jugados`, `h2h_ganados_local`, `h2h_empates`, `h2h_ganados_visita`, `h2h_gf_prom` | Enfrentamientos previos entre ambos (últimos 6): rivalidad/patrón de estilo |
+
+Total: **31 features por partido** (8 forma + 8 condición + 2 descanso + 8 tabla + 5 H2H).
+
+### Limitaciones documentadas (con plan de resolución)
+- **H2H limitado a la temporada corriente** (la historia se carga por temporada) →
+  si se quiere profundidad histórica, extender `HistoriaLiga` para cargar temporadas
+  previas (más requests en Fase 2 o CSV de FBref). Registrado para mejora futura.
+- **Sin xG** en el free tier de football-data.org → el substituto tangente son los
+  goles medios (rolling); xG real via scraping Understat si se desea (Fase 14+).
+- **Features de JUGADOR diferidos a la Fase 6** (el free tier solo da top-10 goleadores
+  agregados, sin minutos ni por partido; al llegar se documentarán en esta misma sección).

@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22 (Sesión 4)
+> Última actualización: 2026-10-22 (Sesión 5)
 
 ---
 
@@ -35,9 +35,10 @@
 - [x] Demo de consulta real vía `docker exec` + psql (top 8 de LaLiga desde la BD)
 
 ## FASE 4 — MÉTRICAS DE RENDIMIENTO (features)
-- [ ] Features de equipo: forma, goles fav/contra, local/visita, H2H, tabla, descanso
-- [ ] Features de jugador: minutos, goles/90, asistencias/90, tiros, forma
-- [ ] Cada feature documentado en `00_CONTEXTO.md`
+- [x] Features de EQUIPO: forma (ventana 5), goles fav/contra, rendimiento casa/fuera, H2H (6), tabla snapshot punto-en-tiempo, descanso (2026-10-22: `backend/app/features.py`, 31 features, regla walk-forward anti-filtración)
+- [x] Verificación cruzada doble-camino: SQL puro (psql ventana 5) vs Python features → coincidencia exacta (2026-10-22: Alavés pts5=1/gf5=3/gc5=7)
+- [x] Cada feature documentado con su justificación y limitaciones en `00_CONTEXTO.md` (sección 10 — catálogo)
+- [~] Features de JUGADOR → **deferido a Fase 6** por límite de datos del free tier (solo top-10 goleadores agregados, sin minutos ni por partido)
 
 ## FASE 5 — MODELO DE EQUIPO
 - [ ] Baseline: Poisson doble (marcadores esperados local/visita)
