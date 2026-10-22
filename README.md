@@ -44,6 +44,26 @@ copy .env.example .env    # luego rellena FOOTBALL_API_KEY
 # 3. Ingesta de datos + API + UI (fases siguientes del plan)
 ```
 
+## ☁️ Despliegue (Fase 11 — 3 servicios gratuitos)
+
+| Servicio | Plataforma | Cómo se actualiza |
+|---|---|---|
+| UI (Next.js, `web/`) | [Vercel](https://vercel.com) | push a `main` (producción) · pull requests (previews) |
+| API (FastAPI) | [Render](https://render.com) | Blueprint [`render.yaml`](render.yaml): cada push reconstruye la imagen y aplica las migraciones al arrancar |
+| Base de datos | [Neon](https://neon.tech) | migraciones Alembic · schema Postgres 16 |
+
+Variables de entorno (ninguna vive en el repo):
+
+| Variable | Dónde | Valor |
+|---|---|---|
+| `DATABASE_URL` | Render (secreto) | DSN de Neon en formato SQLAlchemy: `postgresql+psycopg://usuario:password@host/neondb?sslmode=require` |
+| `NEXT_PUBLIC_API_URL` | Vercel | URL pública de la API (`https://analizador-api.onrender.com`) — la lee el navegador |
+| `API_URL_SERVIDOR` | Vercel | La misma URL de la API — la usa el SSR de Next (ver [`web/.env.example`](web/.env.example)) |
+| `FOOTBALL_API_KEY` | `.env` local (y GitHub Secrets desde la Fase 12) | clave de football-data.org |
+
+El free tier de Render duerme tras 15 min sin tráfico (~1 min de arranque en frío);
+el health check del servicio es `GET /health`.
+
 ## 📡 Fuentes de datos
 
 - [football-data.org](https://www.football-data.org) (tier gratuito, 10 req/min) —

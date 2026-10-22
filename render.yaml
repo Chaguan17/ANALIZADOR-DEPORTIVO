@@ -1,0 +1,33 @@
+# Blueprint de Render — Fase 11 "deploy continuo" (backend FastAPI)
+#
+# Render lee este archivo al crear un Blueprint (Dashboard → New → Blueprint
+# → seleccionar este repo) y define el servicio ya configurado: solo pide
+# rellenar el valor de los estados marcados con `sync: false` (los secretos).
+#
+# URL pública resultante: https://analizador-api.onrender.com
+#
+# flujo continuo en cada push a main (autoDeployTrigger: commit):
+#   1. construye la imagen con ./backend/Dockerfile (contexto ./backend)
+#   2. el arranque de la imagen aplica `alembic upgrade head` (migraciones)
+#   3. el health check en /health valida cada deploy (cero-downtime si falla,
+#      Render aborta el deploy y explica el motivo en el log).
+#
+# Base de datos: Neon (no es de Render). DATABASE_URL se rellena en el
+# dashboard al crear el Blueprint, en formato SQLAlchemy + sslmode:
+#   postgresql+psycopg://<usuario>:<password>@<host-directo>/neondb?sslmode=require
+# Usar el endpoint DIRECTO de Neon (cuyo host NO lleva `-pooler`).
+
+services:
+  - type: web
+    name: analizador-api        # URL: https://analizador-api.onrender.com
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    branch: main                # producción = rama main
+    plan: free                  # 0.1 CPU / 512 MB; duerme tras 15 min sin tráfico
+    region: frankfurt           # cerca de la BD de Neon (elige Frankfurt eu-central-1 al crear el proyecto)
+    healthCheckPath: /health
+    autoDeployTrigger: commit   # deploy automático con cada push a main
+    envVars:
+      - key: DATABASE_URL
+        sync: false             # secreto (DSN de Neon) → se rellena en el dashboard
