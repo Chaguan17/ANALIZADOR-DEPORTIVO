@@ -4,7 +4,7 @@
 # → seleccionar este repo) y define el servicio ya configurado: solo pide
 # rellenar el valor de los estados marcados con `sync: false` (los secretos).
 #
-# URL pública resultante: https://analizador-api.onrender.com
+# URL pública resultante: https://analizador-api-iule.onrender.com
 #
 # flujo continuo en cada push a main (autoDeployTrigger: commit):
 #   1. construye la imagen con ./backend/Dockerfile (contexto ./backend)
@@ -19,7 +19,7 @@
 
 services:
   - type: web
-    name: analizador-api        # URL: https://analizador-api.onrender.com
+    name: analizador-api        # URL real: https://analizador-api-iule.onrender.com
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
@@ -31,3 +31,5 @@ services:
     envVars:
       - key: DATABASE_URL
         sync: false             # secreto (DSN de Neon) → se rellena en el dashboard
+      - key: CORS_ORIGINS       # dominios que llaman a la API desde el NAVEGADOR
+        value: https://analizador-deportivo-rouge.vercel.app,http://localhost:3000

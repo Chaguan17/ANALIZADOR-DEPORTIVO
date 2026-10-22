@@ -21,3 +21,13 @@ DATABASE_URL = os.environ.get(
     "DATABASE_URL",
     "postgresql+psycopg://analizador:devpassword@localhost:5432/analizador",
 )
+
+# CORS (Fase 11): dominios autorizados a llamar a la API desde el NAVEGADOR,
+# separados por comas. El valor por defecto es de desarrollo; en producción
+# Render lo alimenta con los dominios reales (ver render.yaml). El SSR de la
+# web sale del servidor y no pasa por CORS en absoluto.
+CORS_ORIGINS = [
+    o.strip()
+    for o in os.environ.get("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if o.strip()
+]

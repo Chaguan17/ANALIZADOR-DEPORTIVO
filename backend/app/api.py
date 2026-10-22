@@ -14,8 +14,9 @@ evaluación honesta Fase 7) con endpoints simples y documentados:
 Convenciones:
 - Los ids son los de football-data.org (PK de todas las tablas desde Fase 3).
 - Pydantic valida y documenta todo (Swagger interactivo en /docs).
-- CORS abierto ("*") para que el frontend de Vercel consuma desde otro dominio;
-  en producción se estrechará al dominio real.
+- CORS configurable por `CORS_ORIGINS` (env: dominios separados por comas).
+  Fase 8 abría "*" para no bloquear el desarrollo; Fase 11 lo estrecha:
+  solo localhost:3000 por defecto, y los dominios reales via Render (render.yaml).
 - Local: .venv/Scripts/python -m backend.app.api  → http://127.0.0.1:8000/docs
   Docker (Fase 8): uvicorn app.api:app --host 0.0.0.0 --port 8000
 """
@@ -31,6 +32,7 @@ from pydantic import BaseModel
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, aliased
 
+from .config import CORS_ORIGINS
 from .db import SessionLocal
 from .models import (
     Clasificacion,
@@ -55,8 +57,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # se estrechará al dominio real de Vercel en producción
-    allow_methods=["*"],
+    allow_origins=CORS_ORIGINS,     # Fase 11: el "*" de la Fase 8 se estrecha (env CORS_ORIGINS)
+    allow_credentials=False,
+    allow_methods=["GET", "HEAD"],  # API pública y de solo lectura
     allow_headers=["*"],
 )
 
