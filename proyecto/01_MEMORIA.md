@@ -466,6 +466,80 @@ SA 0.35, BL1 0.00, CL 0.40.
    UNIQUE (partido, modelo); probar /fixtures devolverá los 3.
 2. o Fase 10: CI (ruff/pytest/build) para blindar antes de crecer.
 
+## Sesión 10 · 2026-10-22 · FASE 9 COMPLETA (Frontend Next.js)
+
+**Qué se hizo:**
+- Scaffold `web/` con create-next-app: Next **16.4.2** + React 19.3 + Tailwind
+  v4 + ESLint 9. La plantilla de 2026 activa por defecto `cacheComponents` y
+  `partialPrefetching` y genera tipos de rutas (`PageProps<'/ruta'>` global,
+  params/searchParams como Promise awaits) → leímos los docs internos
+  (`node_modules/next/dist/docs/`) antes de escribir código.
+- Arquitectura: páginas 100% server-side; cada una envuelve su contenido en
+  `<Suspense>` → Next genera el shell estático en build y **sirve los datos
+  por streaming en cada petición** con `fetch` `no-store`. La web NUNCA toca
+  la BD: contratos TS espejo 1:1 de los esquemas Pydantic en `web/lib/api.ts`.
+- Dos URL de API para no mentir a nadie: `NEXT_PUBLIC_API_URL` (navegador) y
+  `API_URL_SERVIDOR` (SSR; en docker `http://api:8000`); default local
+  `http://127.0.0.1:8000` en `.env.example` (y copia a `.env.local`, que no se
+  commitea).
+- Contrato visual propio (no plantilla): **pizarra táctica** verde profundo
+  para marca/nav/pie sobre **papel frío** de estadístico; Archivo variable con
+  eje wdth (la marca se expande a cartel deportivo) + Spline Sans Mono para
+  TODOS los números de datos (tabular-nums); el color de las **barras codifica
+  el resultado** (1 azul / X gris / 2 rojo) y las **voces por modelo** llevan
+  su identidad en puntos y acentos (Poisson azul, Dixon-Coles oro, LightGBM
+  violeta) — misma leyenda en toda la web.
+- Las 6 páginas + 404: `/` (fixtures con selector de liga con nombre completo
+  y selector de voz; barra 1X2 por fila; favorito%), `/partido/[id]` (las 3
+  voces lado a lado: λ local/visita, Over 2.5, marcador estimado, más las
+  líneas de diagnóstico sacadas del JSONB: ρ de DC con su semántica, w de
+  LightGBM con su lectura honesta, partidos de evidencia; los "—" del LGBM se
+  explican en la página), `/equipo/[id]` (tablero pos/puntos/portería en la
+  pizarra, forma G/E/P, últimos 5 con veredicto, próximos 3 enlazados),
+  `/ranking/[liga]` (tabla completa con forma en chips de colores),
+  `/precision` (tabla log loss por modelo×liga con campeón por liga marcado
+  con su voz + total ponderado por n; segunda tabla de acierto; nota honesta
+  sobre los n distintos de LGBM y la referencia uniforme 1.0986),
+  `/jugador/[id]` (ficha mínima + aviso "en pañales" → Fase 6).
+- Estados vacíos y errores NARRADOS: si la API está apagada, la página lo dice
+  y enseña el comando para levantarla; ligas inválidas y ids inexistentes
+  tienen sus avisos dedicados, con enlaces de escape.
+- Docker del `web` deferido a Fase 11 (producción = Vercel): comentario del
+  compose actualizado — desviación menor documentada.
+- `web/README.md` con páginas, comandos y variables de entorno.
+
+**Bugs de camino corregidos:**
+- `searchParams` en Next tipo `string | string[] | undefined` → predicados de
+  tipo (`esLigaValida`/`esModeloValido` ahora son type guards).
+- `ResultadoReciente` del backend NO trae ids de equipos (solo nombres) → la
+  ficha determina casa/fuera comparando el nombre, no el id.
+- Copy en español pulido (verbos de usuario, sin florituras).
+
+**Verificación de punta a punta:**
+- `npm run build` limpio: 8 rutas, shell estático + contenido dynamic (◐).
+- Humo con urllib contra el dev server (Next en :3000, mi uvicorn en :8000):
+  14 casos — 13×200 con muestras de contenido correcto (home PD default,
+  home CL/PL/BL1 con 3 voces distintas, detalle real con "Las tres voces",
+  ficha equipo con Balance/Posición/Puntos, jugador, ranking PD, ranking
+  inválido con aviso y enlaces, precision con los 3 modelos, 404 propia) +
+  `/esta/ruta/rrara` → HTTP 404 COMO SE DEBERÍA (mi script pedía 200: el 404
+  con página bonita es el resultado CORRECTO).
+- Trazo del log de la API verificó cada llamada HTTP detrás (fixtures×4,
+  predictions 200+404, teams 200+404, players 200+404, rankings,
+  model-accuracy).
+- Higiene de procesos: matados mi uvicorn temporal (PID 2212) y mi node dev
+  (PID 8324); el listener de docker-proxy en 8000 es el contenedor `api` del
+  PROPIETARIO corriendo desde la Fase 8 — no se tocó (regla del proyecto).
+
+**Estado tras Fase 9:** capas completas — datos (API ingestas) → BD
+Postgres → features → 3 modelos que compiten → API FastAPI → **web que los
+enseña**. Pendientes: CI (Fase 10), deploy (11), cron (12), motor (13).
+
+**Siguientes pasos:**
+1. Fase 10: CI con GitHub Actions (ruff → pytest → docker build; npm lint →
+   build) — blindar ANTES de seguir creciendo.
+2. Fase 11: deploy (Neon + Render + Vercel) con las variables ya diseñadas.
+
 
 
 

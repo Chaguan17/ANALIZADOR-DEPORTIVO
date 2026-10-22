@@ -1,0 +1,497 @@
+@import "tailwindcss";
+
+/* ══ Tokens ════════════════════════════════════════════════════════
+   Un solo concepto: la pizarra táctica del vestuario sobre papel frío
+   de estadístico. El color de las barras codifica RESULTADO (1/X/2);
+   el color de las "voces" identifica AL MODELO (azul/oro/violeta).   */
+:root {
+  --papel: #f2f4ef;
+  --tinta: #1b2822;
+  --tinta-2: #5d6b62;
+  --linea: #d9ded4;
+  --blanco: #ffffff;
+
+  --pizarra: #12352b;
+  --pizarra-2: #0e2a22;
+  --tiza: #f4f1e4;
+  --tiza-2: #a9b8ac;
+
+  --c-1: #23709e; /* resultado: gana el local */
+  --c-x: #97a69d; /* resultado: empate */
+  --c-2: #c04a32; /* resultado: gana el visitante */
+
+  --voz-poisson-doble: #17698a;
+  --voz-poisson-dc: #8a6400;
+  --voz-lightgbm-v1: #5f4593;
+}
+
+/* ══ Base ══════════════════════════════════════════════════════════ */
+body {
+  background: var(--papel);
+  color: var(--tinta);
+  font-family: var(--font-archivo), "Segoe UI", Arial, sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+/* Números de datos: tabulares y monoespaciados (goles, probabilidades) */
+.num {
+  font-family: var(--font-num), Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══ Pizarra: cabecera y pie ═══════════════════════════════════════ */
+.pizarra-barra,
+.pizarra-pie {
+  background: var(--pizarra);
+  color: var(--tiza);
+}
+
+.barra-interior {
+  max-width: 68rem;
+  margin-inline: auto;
+  padding: 1.1rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 2rem;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.marca {
+  text-decoration: none;
+  color: inherit;
+}
+.marca-texto {
+  display: block;
+  font-weight: 800;
+  font-stretch: 116%; /* eje wdth de Archivo → voz de cartel deportivo */
+  letter-spacing: 0.02em;
+  font-size: 1.28rem;
+  text-transform: uppercase;
+}
+.marca-lema {
+  display: block;
+  color: var(--tiza-2);
+  font-size: 0.78rem;
+}
+
+.nav-principal {
+  display: flex;
+  gap: 1.4rem;
+}
+.nav-enlace {
+  color: var(--tiza);
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.95rem;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 0.1rem;
+}
+.nav-enlace:hover {
+  border-bottom-color: var(--tiza);
+}
+
+.pizarra-pie {
+  margin-top: 3.5rem;
+  font-size: 0.78rem;
+  color: var(--tiza-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2rem 2rem;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+}
+
+/* ══ Contenedor y títulos ══════════════════════════════════════════ */
+.contenedor {
+  max-width: 68rem;
+  margin-inline: auto;
+  padding: 1.5rem 1.5rem 2rem;
+}
+
+.titulo-pagina {
+  font-size: 1.9rem;
+  font-weight: 750;
+  font-stretch: 108%;
+  letter-spacing: 0.01em;
+  line-height: 1.15;
+  margin: 0.4rem 0 0.15rem;
+}
+.titulo-sub {
+  color: var(--tinta-2);
+  font-size: 0.92rem;
+  margin: 0 0 1.1rem;
+}
+.titulo-bloque {
+  font-size: 1.05rem;
+  font-weight: 700;
+  margin: 1.8rem 0 0.55rem;
+}
+
+/* ══ Selectores: ligas y voces ═════════════════════════════════════ */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.6rem 0 0.9rem;
+}
+.chip {
+  border: 1px solid var(--linea);
+  background: var(--blanco);
+  color: var(--tinta);
+  text-decoration: none;
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding: 0.22rem 0.7rem;
+  border-radius: 99px;
+}
+.chip:hover {
+  border-color: var(--tinta-2);
+}
+.chip-activa {
+  background: var(--tinta);
+  border-color: var(--tinta);
+  color: var(--papel);
+}
+
+.sel-modelo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.4rem 0 1.2rem;
+  border: 1px solid var(--linea);
+  background: var(--blanco);
+  border-radius: 99px;
+  padding: 0.28rem;
+  width: fit-content;
+}
+.voz {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  text-decoration: none;
+  color: var(--tinta-2);
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.18rem 0.75rem;
+  border-radius: 99px;
+}
+.voz:hover {
+  color: var(--tinta);
+}
+.voz-activa {
+  color: var(--tinta);
+  background: var(--papel);
+  box-shadow: inset 0 0 0 1px var(--linea);
+}
+.punto-voz {
+  width: 0.6rem;
+  height: 0.6rem;
+  border-radius: 99px;
+}
+.voz-poisson_doble .punto-voz {
+  background: var(--voz-poisson-doble);
+}
+.voz-poisson_dc .punto-voz {
+  background: var(--voz-poisson-dc);
+}
+.voz-lightgbm_v1 .punto-voz {
+  background: var(--voz-lightgbm-v1);
+}
+
+/* ══ Lista de fixtures (casa) ══════════════════════════════════════ */
+.lista-partidos {
+  border-top: 2px solid var(--tinta);
+}
+.fila-partido {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr 12rem;
+  gap: 0.6rem 1.2rem;
+  align-items: center;
+  padding: 0.85rem 0.4rem;
+  border-bottom: 1px solid var(--linea);
+  text-decoration: none;
+  color: inherit;
+}
+.fila-partido:hover {
+  background: var(--blanco);
+}
+.cuando {
+  color: var(--tinta-2);
+  font-size: 0.85rem;
+}
+.cuando .num {
+  display: block;
+  font-size: 0.95rem;
+  color: var(--tinta);
+}
+.quienes {
+  min-width: 0;
+}
+.rivalidad {
+  font-weight: 650;
+  font-size: 1.02rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rivalidad .rival-vs {
+  color: var(--tinta-2);
+  font-weight: 400;
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+}
+.favorito {
+  text-align: right;
+  font-size: 0.9rem;
+  color: var(--tinta-2);
+}
+.favorito strong {
+  color: var(--tinta);
+  font-size: 1rem;
+}
+.sin-prediccion {
+  color: var(--tinta-2);
+  font-style: italic;
+}
+
+/* ══ Barra 1X2 ═════════════════════════════════════════════════════ */
+.barra1x2 {
+  display: flex;
+  height: 0.6rem;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-top: 0.35rem;
+  max-width: 30rem;
+}
+.barra1x2 .seg-1 {
+  background: var(--c-1);
+}
+.barra1x2 .seg-x {
+  background: var(--c-x);
+}
+.barra1x2 .seg-2 {
+  background: var(--c-2);
+}
+
+.leyenda1x2 {
+  display: inline-flex;
+  gap: 0.9rem;
+  font-size: 0.78rem;
+  color: var(--tinta-2);
+}
+.leyenda1x2::before {
+  content: "";
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  background: linear-gradient(
+    90deg,
+    var(--c-1) 33%,
+    var(--c-x) 33% 66%,
+    var(--c-2) 66%
+  );
+}
+
+/* ══ Tablas (detalle, rankings, precisión) ═════════════════════════ */
+.tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.tabla th {
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--tinta-2);
+  border-bottom: 2px solid var(--tinta);
+  padding: 0.4rem 0.6rem;
+  white-space: nowrap;
+}
+.tabla td {
+  border-bottom: 1px solid var(--linea);
+  padding: 0.5rem 0.6rem;
+  vertical-align: top;
+}
+.tabla .num {
+  text-align: right;
+  white-space: nowrap;
+}
+.tabla th.num {
+  text-align: right;
+}
+
+.fila-modelo td:first-child {
+  font-weight: 650;
+}
+.diag {
+  color: var(--tinta-2);
+  font-size: 0.8rem;
+}
+.diag td {
+  border-bottom: 1px solid var(--linea);
+  padding: 0.1rem 0.6rem 0.45rem;
+}
+.marcado {
+  box-shadow: inset 3px 0 0 var(--voz-ll, var(--tinta)); /* mejor de la liga */
+}
+
+/* ══ Ficha de equipo ═══════════════════════════════════════════════ */
+.ficha-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin: 0.8rem 0 1.2rem;
+}
+.escudo {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  background: var(--blanco);
+  border: 1px solid var(--linea);
+  border-radius: 6px;
+  padding: 4px;
+}
+.tla {
+  display: inline-block;
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.75rem;
+  border: 1px solid var(--linea);
+  border-radius: 3px;
+  padding: 0 0.35rem;
+  color: var(--tinta-2);
+  background: var(--blanco);
+}
+
+.tablero-pos {
+  background: var(--pizarra);
+  color: var(--tiza);
+  border-radius: 8px;
+  padding: 0.9rem 1.2rem;
+  display: flex;
+  gap: 2.2rem;
+  width: fit-content;
+  margin: 0.4rem 0 1.4rem;
+}
+.tablero-pos .grande {
+  display: block;
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 1.9rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-top: 0.25rem;
+}
+.tablero-pos small {
+  color: var(--tiza-2);
+  font-size: 0.72rem;
+  letter-spacing: 0.05em;
+}
+
+.lista-fichas {
+  border-top: 2px solid var(--tinta);
+}
+.fila-ficha {
+  display: grid;
+  grid-template-columns: 9.5rem 1fr 9rem;
+  gap: 0.6rem 1rem;
+  align-items: baseline;
+  padding: 0.55rem 0.3rem;
+  border-bottom: 1px solid var(--linea);
+}
+.fila-ficha a {
+  color: inherit;
+  text-decoration-color: var(--tinta-2);
+}
+.resultado-eq {
+  font-family: var(--font-num), Consolas, monospace;
+  text-align: right;
+  font-weight: 700;
+}
+.res-gano {
+  color: #1b6b3a;
+}
+.res-perdio {
+  color: var(--c-2);
+}
+.res-empato {
+  color: var(--tinta-2);
+}
+
+/* forma en rankings: G/E/P encendidos */
+.forma-celdas {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+.forma-c {
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.72rem;
+  width: 1.25rem;
+  height: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  color: var(--blanco);
+}
+.f-gana {
+  background: #1b6b3a;
+}
+.f-empata {
+  background: #97a69d;
+}
+.f-pierde {
+  background: var(--c-2);
+}
+
+/* ══ Avisos / carga ════════════════════════════════════════════════ */
+.aviso {
+  border: 1px solid var(--linea);
+  border-left: 4px solid var(--c-2);
+  background: var(--blanco);
+  padding: 1rem 1.2rem;
+  margin: 1.2rem 0;
+  max-width: 40rem;
+}
+.aviso-detalle {
+  color: var(--tinta-2);
+  font-size: 0.88rem;
+  margin-top: 0.35rem;
+}
+.aviso code {
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.8rem;
+  background: var(--papel);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+
+.cargando {
+  color: var(--tinta-2);
+  padding: 2rem 0;
+  font-size: 0.9rem;
+}
+
+/* foco visible de teclado en toda la web */
+a:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--voz-poisson-doble);
+  outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .fila-partido {
+    grid-template-columns: 1fr;
+    gap: 0.35rem;
+  }
+  .favorito {
+    text-align: left;
+  }
+  .barra1x2 {
+    max-width: none;
+  }
+  .tabla-scroll {
+    overflow-x: auto;
+  }
+}

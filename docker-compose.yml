@@ -39,8 +39,9 @@ services:
       db:
         condition: service_healthy
 
-  # ── Se añaden en fases siguientes ─────────────────────
-  # web:  Next.js (Fase 9) → depende de: api
+  # ── Fase 11 (deploy) ──────────────────────────────────
+  # web: Next.js — producción en Vercel; el contenedor web se agrega ahí
+  # (dev local: cd web && npm run dev → http://localhost:3000).
 
 volumes:
   pgdata:

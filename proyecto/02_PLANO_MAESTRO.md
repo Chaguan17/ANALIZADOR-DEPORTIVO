@@ -61,9 +61,9 @@
 - [x] `docker-compose` con `db` + `api` en local (servicio `api` con `depends_on: db healthy` · build/arranque 100% manual del propietario: `docker compose up -d db api` · la `web` de Next.js llega en Fase 9)
 
 ## FASE 9 — FRONTEND NEXT.JS
-- [ ] Scaffold con TypeScript + Tailwind + App Router
-- [ ] Páginas: Próximos partidos · Detalle de partido · Perfil equipo · Perfil jugador · Ranking · Precisión
-- [ ] Integración con la API (`NEXT_PUBLIC_API_URL`)
+- [x] Scaffold con TypeScript + Tailwind + App Router (2026-10-22: `web/` · Next 16.4.2 + React 19 + Tailwind v4 · `cacheComponents` + prerender parcial por defecto · fuentes Archivo (eje wdth) + Spline Sans Mono para datos · diseño propio: pizarra táctica + papel frío, color de barra codifica RESULTADO (1/X/2) y voces por MODELO (Poisson azul · DC oro · LightGBM violeta) · build limpio 8 rutas)
+- [x] Páginas: Próximos partidos (`/` con selector de liga + de voz/modelo) · Detalle de partido (`/partido/[id]` con las 3 voces, λ/O2.5, diagnóstico JSONB: ρ, w, evidencia) · Perfil equipo (`/equipo/[id]`) · Perfil jugador (`/jugador/[id]`, honesto de Fase 6) · Ranking (`/ranking/[liga]` con formas G/E/P) · Precisión (`/precision`, log loss + acierto por modelo y liga con campeón por liga) · 404 propia
+- [x] Integración con la API (`NEXT_PUBLIC_API_URL` navegador + `API_URL_SERVIDOR` para SSR/docker · contratos TS espejo 1:1 de Pydantic en `web/lib/api.ts` · fetch `no-store` dentro de `<Suspense>` → datos frescos por stream · humo 14 casos: 13×200 + 404-correcta · los errores de la API se narran con el comando para levantarla)
 
 ## FASE 10 — CI CONTINUO (.github/workflows/ci.yml)
 - [ ] Job backend: ruff → pytest → docker build
