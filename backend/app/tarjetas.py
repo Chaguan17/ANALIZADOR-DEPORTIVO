@@ -165,16 +165,24 @@ def lam_de(historia: list[dict], fila: dict) -> float | None:
     return t_l + t_v
 
 
-def filas_complete_for(filas: list[dict]) -> list[dict]:
+def filas_completas(filas: list[dict]) -> list[dict]:
     """Solo filas con AMBOS lados con datos de tarjetas (para calidad/real)."""
     return [f for f in filas if bloques_de(f)[0] is not None and bloques_de(f)[1] is not None]
 
 
 def calidad_de_filas(filas: list[dict]) -> dict:
-    """Walk-forward de la liga: acierto O/U 2.5/3.5 + MAE de λ."""
-    evaluated = [{**f, "real": (total_de(bloques_de(f)[0]) or 0) + (total_de(bloques_de(f)[1]) or 0)}
-                 for f in filas]
-    return evaluar_walk_forward(evaluated, lam_de, LINES)
+    """Walk-forward de la liga: acierto O/U 2.5/3.5 + MAE de λ.
+
+    Solo filas con el BLOQUE de tarjetas en ambos lados: una fila marca-de-vacío
+    (la ingesta la dejó sin totales) no debería contaminar la métrica — es la
+    regla que stats_filas documenta: cada dominio salta lo que le falta.
+    """
+    completas = filas_completas(filas)
+    evaluadas = [
+        {**f, "real": (total_de(bloques_de(f)[0]) or 0) + (total_de(bloques_de(f)[1]) or 0)}
+        for f in completas
+    ]
+    return evaluar_walk_forward(evaluadas, lam_de, LINES)
 
 
 def prediccion_de_filas(

@@ -18,6 +18,7 @@ from backend.app.rates import (
 )
 from backend.app.tarjetas import (
     bloques_de,
+    calidad_de_filas,
     contados_por_jugador,
     equipos_tarjetas,
     extraer_tarjetas,
@@ -220,3 +221,20 @@ def test_prediccion_de_filas_walk_forward():
         _fila(1, ESTA_F, 1, 2, _bloque(3, 0), None),
     ]
     assert prediccion_de_filas(historial_roto, 1, 2, OTRA_F) is None
+
+
+def test_calidad_salta_las_filas_sin_bloque_de_tarjetas():
+    """Fix Fase 16: una fila marca-de-vacío (ambos lados sin bloque) NO entra
+    al evaluado — antes se contaba con real=0 y contaminaba las métricas."""
+    filas = [
+        _fila(1, ESTA_F, 1, 2, _bloque(3, 0), _bloque(2, 0)),
+        _fila(2, OTRA_F, 1, 2, None, None),  # marca-de-vacío de la ingesta
+    ]
+    calidad = calidad_de_filas(filas)
+    # solo la primera fila es evaluable (y por debutante, 0 evaluados)
+    assert calidad["omisiones"] == 1
+    for linea in ("2.5", "3.5"):
+        r = calidad["lineas"][linea]
+        assert r["evaluados"] == 0
+        assert r["aciertos"] == 0
+        assert r["accuracy"] is None and r["mae"] is None

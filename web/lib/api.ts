@@ -224,6 +224,72 @@ export interface TarjetasLiga {
   notas: string[];
 }
 
+// ── Fase 16: tiros y cornes (el MISMO summary ESPN de la ingesta común) ──
+
+export interface TiradorJugador {
+  nombre: string;
+  tiros: number;
+  apariciones: number;
+  tasa: number | null;
+}
+
+export interface TirosLadoReal {
+  total: number;
+  a_puerta: number;
+}
+
+export interface PredTiros {
+  tiros_esperados: number;
+  a_puerta_esperados: number;
+  prob_over_23_5: number;
+  prob_a_puerta_over_8_5: number;
+  por_equipo: Record<string, { tiros: number | null; a_puerta: number | null }>;
+}
+
+export interface TirosPartido {
+  partido_id_api: number;
+  liga: string;
+  fecha_utc: string;
+  estado: string;
+  jornada: number | null;
+  local: string;
+  visitante: string;
+  fuente: string | null;
+  cobertura: CoberturaEspn;
+  calidad: CalidadLinea[];
+  reales: Record<"local" | "visitante", TirosLadoReal> | null;
+  prediccion: PredTiros | null;
+  tiradores: Record<string, TiradorJugador[]> | null;
+  notas: string[];
+}
+
+export interface PredCornes {
+  cornes_esperados: number;
+  prob_over_9_5: number;
+  prob_over_11_5: number;
+  por_equipo: Record<string, number | null>;
+}
+
+export interface CornesLadoReal {
+  total: number;
+}
+
+export interface CornesPartido {
+  partido_id_api: number;
+  liga: string;
+  fecha_utc: string;
+  estado: string;
+  jornada: number | null;
+  local: string;
+  visitante: string;
+  fuente: string | null;
+  cobertura: CoberturaEspn;
+  calidad: CalidadLinea[];
+  reales: Record<"local" | "visitante", CornesLadoReal> | null;
+  prediccion: PredCornes | null;
+  notas: string[];
+}
+
 /** Lee un número del JSONB de diagnóstico (o null si no viaja). */
 export function numDe(o: DatosExtra | null, clave: string): number | null {
   if (!o) return null;
@@ -270,3 +336,9 @@ export const obtenerTarjetasLiga = (liga: string) =>
 
 export const obtenerTarjetas = (idPartido: number) =>
   jsonDe<TarjetasPartido>(`/partido/${idPartido}/tarjetas`);
+
+export const obtenerTiros = (idPartido: number) =>
+  jsonDe<TirosPartido>(`/partido/${idPartido}/tiros`);
+
+export const obtenerCornes = (idPartido: number) =>
+  jsonDe<CornesPartido>(`/partido/${idPartido}/cornes`);

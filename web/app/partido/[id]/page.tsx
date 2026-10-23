@@ -4,12 +4,17 @@ import Aviso, { Cargando } from "@/components/Aviso";
 import Barra1x2 from "@/components/Barra1x2";
 import {
   numDe,
+  obtenerCornes,
   obtenerPredicciones,
   obtenerTarjetas,
+  obtenerTiros,
+  type CornesPartido,
   type DatosExtra,
   type PrediccionesPartido,
   type TarjetaJugador,
   type TarjetasPartido,
+  type TirosPartido,
+  type TiradorJugador,
 } from "@/lib/api";
 import { fechaDia, horaUtc, nombreModelo, num, pct } from "@/lib/formato";
 
@@ -57,6 +62,20 @@ async function Contenido(props: PageProps<"/partido/[id]">) {
     tarjetas = await obtenerTarjetas(idNum);
   } catch {
     tarjetas = null;
+  }
+
+  // Fase 16: tiros y cornes leen el MISMO summary ESPN (endpoints on-request).
+  let tiros: TirosPartido | null = null;
+  try {
+    tiros = await obtenerTiros(idNum);
+  } catch {
+    tiros = null;
+  }
+  let cornes: CornesPartido | null = null;
+  try {
+    cornes = await obtenerCornes(idNum);
+  } catch {
+    cornes = null;
   }
 
   return (
@@ -122,6 +141,8 @@ async function Contenido(props: PageProps<"/partido/[id]">) {
       </p>
 
       {tarjetas && <SeccionTarjetas t={tarjetas} />}
+      {tiros && <SeccionTiros t={tiros} />}
+      {cornes && <SeccionCornes t={cornes} />}
     </div>
   );
 }
@@ -392,4 +413,235 @@ function filaDeTarjetas(
       (e) => `${e.nombre} ${e.minuto != null ? `${e.minuto}'` : ""} (${e.tipo})`.trim(),
     );
   return eventos.join(" · ");
+}
+
+/* ────────────── Tiros (Fase 16) — el mismo summary ESPN, on-request ───────── */
+
+function SeccionTiros({ t }: { t: TirosPartido }) {
+  return (
+    <section style={{ marginTop: "2.4rem" }}>
+      <h2 className="titulo-bloque">Tiros{t.fuente ? " · ESPN" : ""}</h2>
+      <p className="titulo-sub">
+        Total del partido (tiros y a puerta) desde DOS Poisson con las tasas por
+        equipo encogidas hacia la media de liga — cada evento tiene su propio λ.
+        Cobertura del dominio:
+        {` ${t.cobertura.con_datos}/${t.cobertura.jugados}`} jugados con datos
+        (el backfill avanza con el cron).
+      </p>
+
+      {t.prediccion && (
+        <div className="tabla-scroll">
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Predicción</th>
+                <th className="num">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="fila-modelo">
+                <td>Tiros esperados (total)</td>
+                <td className="num">{num(t.prediccion.tiros_esperados)}</td>
+              </tr>
+              <tr className="fila-modelo">
+                <td>A puerta esperados</td>
+                <td className="num">{num(t.prediccion.a_puerta_esperados)}</td>
+              </tr>
+              <tr>
+                <td>Prob. over 23.5 (tiros)</td>
+                <td className="num">{pct(t.prediccion.prob_over_23_5)}</td>
+              </tr>
+              <tr>
+                <td>Prob. over 8.5 (a puerta)</td>
+                <td className="num">{pct(t.prediccion.prob_a_puerta_over_8_5)}</td>
+              </tr>
+              <tr className="diag">
+                <td colSpan={2}>
+                  por equipo — local: tiros{" "}
+                  {num(t.prediccion.por_equipo.local?.tiros ?? null)} · a puerta{" "}
+                  {num(t.prediccion.por_equipo.local?.a_puerta ?? null)} ·
+                  visitante: tiros{" "}
+                  {num(t.prediccion.por_equipo.visitante?.tiros ?? null)} · a
+                  puerta {num(t.prediccion.por_equipo.visitante?.a_puerta ?? null)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.reales && (
+        <div className="tabla-scroll" style={{ marginTop: "1rem" }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Real</th>
+                <th className="num">Tiros</th>
+                <th className="num">A puerta</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="fila-modelo">
+                <td>{t.local}</td>
+                <td className="num">{t.reales.local.total}</td>
+                <td className="num">{t.reales.local.a_puerta}</td>
+              </tr>
+              <tr>
+                <td>{t.visitante}</td>
+                <td className="num">{t.reales.visitante.total}</td>
+                <td className="num">{t.reales.visitante.a_puerta}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.tiradores && (
+        <div className="tabla-scroll" style={{ marginTop: "1rem" }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Tirador (por aparición)</th>
+                <th className="num">Tiros</th>
+                <th className="num">Jugados</th>
+                <th className="num">Tasa</th>
+              </tr>
+            </thead>
+            <tbody>
+              <LadoTiradores titulo={t.local} filas={t.tiradores.local} />
+              <LadoTiradores titulo={t.visitante} filas={t.tiradores.visitante} />
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.calidad.length > 0 && (
+        <p className="titulo-sub" style={{ marginTop: "1rem" }}>
+          Calidad walk-forward:{" "}
+          {t.calidad
+            .map(
+              (c) =>
+                `O/U ${c.linea}: ${c.aciertos}/${c.evaluados} (${pct(c.accuracy, 0)}) · MAE ${num(c.mae)}`,
+            )
+            .join(" · ")}
+        </p>
+      )}
+      <p className="titulo-sub">notas: {t.notas.join(" · ")}</p>
+    </section>
+  );
+}
+
+/* ────────────── Cornes (Fase 16) — el mismo summary ESPN, on-request ──────── */
+
+function SeccionCornes({ t }: { t: CornesPartido }) {
+  return (
+    <section style={{ marginTop: "2.4rem" }}>
+      <h2 className="titulo-bloque">Cornes{t.fuente ? " · ESPN" : ""}</h2>
+      <p className="titulo-sub">
+        Total de saques de esquina del partido («wonCorners» de ESPN por equipo)
+        desde una Poisson con las tasas por equipo encogidas. Cobertura del
+        dominio: {` ${t.cobertura.con_datos}/${t.cobertura.jugados}`} jugados con
+        datos (el backfill avanza con el cron).
+      </p>
+
+      {t.prediccion && (
+        <div className="tabla-scroll">
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Predicción</th>
+                <th className="num">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="fila-modelo">
+                <td>Cornes esperados (total)</td>
+                <td className="num">{num(t.prediccion.cornes_esperados)}</td>
+              </tr>
+              <tr>
+                <td>Prob. over 9.5</td>
+                <td className="num">{pct(t.prediccion.prob_over_9_5)}</td>
+              </tr>
+              <tr>
+                <td>Prob. over 11.5</td>
+                <td className="num">{pct(t.prediccion.prob_over_11_5)}</td>
+              </tr>
+              <tr className="diag">
+                <td colSpan={2}>
+                  por equipo — local: {num(t.prediccion.por_equipo.local ?? null)} ·
+                  visitante: {num(t.prediccion.por_equipo.visitante ?? null)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.reales && (
+        <div className="tabla-scroll" style={{ marginTop: "1rem" }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Real</th>
+                <th className="num">Cornes</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="fila-modelo">
+                <td>{t.local}</td>
+                <td className="num">{t.reales.local.total}</td>
+              </tr>
+              <tr>
+                <td>{t.visitante}</td>
+                <td className="num">{t.reales.visitante.total}</td>
+              </tr>
+              <tr className="diag">
+                <td colSpan={2}>
+                  total del partido: {t.reales.local.total + t.reales.visitante.total}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.calidad.length > 0 && (
+        <p className="titulo-sub" style={{ marginTop: "1rem" }}>
+          Calidad walk-forward:{" "}
+          {t.calidad
+            .map(
+              (c) =>
+                `O/U ${c.linea}: ${c.aciertos}/${c.evaluados} (${pct(c.accuracy, 0)}) · MAE ${num(c.mae)}`,
+            )
+            .join(" · ")}
+        </p>
+      )}
+      <p className="titulo-sub">notas: {t.notas.join(" · ")}</p>
+    </section>
+  );
+}
+
+function LadoTiradores({ titulo, filas }: { titulo: string; filas: TiradorJugador[] }) {
+  if (filas.length === 0) {
+    return (
+      <tr>
+        <td colSpan={4}>{titulo}: sin tiradores medibles todavía</td>
+      </tr>
+    );
+  }
+  return (
+    <>
+      <tr className="diag">
+        <td colSpan={4}>{titulo}</td>
+      </tr>
+      {filas.map((f) => (
+        <tr key={f.nombre}>
+          <td>{f.nombre}</td>
+          <td className="num">{f.tiros}</td>
+          <td className="num">{f.apariciones}</td>
+          <td className="num">{f.tasa === null ? "—" : num(f.tasa)}</td>
+        </tr>
+      ))}
+    </>
+  );
 }

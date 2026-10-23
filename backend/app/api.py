@@ -32,6 +32,9 @@ from pydantic import BaseModel
 from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session, aliased
 
+# Fase 16: los dos dominios nuevos comparten el JSONB y el núcleo de tarjetas;
+# se importan por módulo para no chocar con nombres ya tomados (bloques_de…).
+from . import cornes, tiros
 from .config import CORS_ORIGINS
 from .db import SessionLocal
 from .models import (
@@ -329,6 +332,137 @@ class TarjetasLiga(BaseModel):
     calidad: list[CalidadLinea]
     equipos: list[TarjetaEquipoTemporada]
     propensos: list[TarjetaJugadorLiga]
+    notas: list[str]
+
+
+# ────────── esquemas de tiros y cornes (Fase 16 — fuente ESPN) ───────────────
+
+
+class TirosLadoReal(BaseModel):
+    """Lo real de un lado (tiros totales y a puerta del equipo)."""
+
+    total: int
+    a_puerta: int
+
+
+class TiradorJugador(BaseModel):
+    """Tirador del ranking por APARICIÓN (leaders totalShots de ESPN)."""
+
+    nombre: str
+    tiros: int
+    apariciones: int
+    tasa: float | None
+
+
+class PredTiros(BaseModel):
+    """Predicción del modelo de tiros: DOS PMF separadas (total / a puerta)."""
+
+    tiros_esperados: float
+    a_puerta_esperados: float
+    prob_over_23_5: float
+    prob_a_puerta_over_8_5: float
+    por_equipo: dict[str, dict[str, float | None]]
+
+
+class TirosPartido(BaseModel):
+    """Todo lo que la web necesita para la sección de tiros de un partido."""
+
+    partido_id_api: int
+    liga: str
+    fecha_utc: datetime
+    estado: str
+    jornada: int | None
+    local: str
+    visitante: str
+    fuente: str | None
+    cobertura: CoberturaEspn
+    calidad: list[CalidadLinea]
+    reales: dict[str, TirosLadoReal] | None
+    prediccion: PredTiros | None
+    tiradores: dict[str, list[TiradorJugador]] | None
+    notas: list[str]
+
+
+class TirosEquipoTemporada(BaseModel):
+    """Resumen por equipo de la liga (la tabla de /tiros?liga)."""
+
+    equipo_id_api: int
+    nombre: str
+    partidos: int
+    tiros: int
+    a_puerta: int
+    tasa_tiros: float
+    tasa_a_puerta: float
+
+
+class TiradorLiga(TiradorJugador):
+    """Tirador con su equipo, para el ranking de liga."""
+
+    equipo: str
+    equipo_id_api: int
+
+
+class TirosLiga(BaseModel):
+    """La vista de liga completa del modelo de tiros."""
+
+    liga: str
+    cobertura: CoberturaEspn
+    calidad: list[CalidadLinea]
+    equipos: list[TirosEquipoTemporada]
+    tiradores: list[TiradorLiga]
+    notas: list[str]
+
+
+class CornesLadoReal(BaseModel):
+    """Lo real de un lado en cornes."""
+
+    total: int
+
+
+class PredCornes(BaseModel):
+    """La predicción del modelo de cornes para un partido."""
+
+    cornes_esperados: float
+    prob_over_9_5: float
+    prob_over_11_5: float
+    por_equipo: dict[str, float | None]
+
+
+class CornesPartido(BaseModel):
+    """Todo lo que la web necesita para la sección de cornes de un partido."""
+
+    partido_id_api: int
+    liga: str
+    fecha_utc: datetime
+    estado: str
+    jornada: int | None
+    local: str
+    visitante: str
+    fuente: str | None
+    cobertura: CoberturaEspn
+    calidad: list[CalidadLinea]
+    reales: dict[str, CornesLadoReal] | None
+    prediccion: PredCornes | None
+    notas: list[str]
+
+
+class CornesEquipoTemporada(BaseModel):
+    """Resumen por equipo de la liga (la tabla de /cornes?liga)."""
+
+    equipo_id_api: int
+    nombre: str
+    partidos: int
+    cornes: int
+    tasa: float
+
+
+class CornesLiga(BaseModel):
+    """La vista de liga completa del modelo de cornes."""
+
+    liga: str
+    cobertura: CoberturaEspn
+    calidad: list[CalidadLinea]
+    equipos: list[CornesEquipoTemporada]
     notas: list[str]
 
 
@@ -824,6 +958,227 @@ def tarjetas_partido(partido_id_api: int, session: Sesion) -> TarjetasPartido:
         reales=reales,
         prediccion=prediccion,
         propensos=propensos,
+        notas=notas,
+    )
+
+
+# ───────────── tiros + cornes (Fase 16 — ESPN, on-request) ──────────────────
+
+NOTAS_TIROS = [
+    "modelo on-request: shrinkage hacia la media de liga + Poisson (una PMF "
+    "para el total de tiros y otra para los a puerta)",
+    "fuente de stats: ESPN (site.api.espn.com), API no oficial sin contrato",
+    "tiradores por APARICION (leaders de tiros); ESPN no da minutos por jugador",
+    "'a puerta' = shotsOnTarget, la etiqueta del boxscore de ESPN",
+]
+
+NOTAS_CORNES = [
+    "modelo on-request: shrinkage hacia la media de liga + Poisson",
+    "fuente de stats: ESPN (site.api.espn.com), API no oficial sin contrato",
+    "sin ranking de jugadores: lo verificable del partido es el TOTAL del equipo",
+]
+
+
+def _completos_dominio(filas: list[dict], bloques) -> int:
+    """Partidos con AMBOS lados del dominio (`bloques` es la función del módulo)."""
+    n = 0
+    for f in filas:
+        bl, bv = bloques(f)
+        if bl is not None and bv is not None:
+            n += 1
+    return n
+
+
+@app.get("/tiros", response_model=TirosLiga, tags=["stats"])
+def tiros_liga(
+    session: Sesion,
+    liga: Annotated[str, Query(min_length=2, max_length=3)],
+) -> TirosLiga:
+    """Tiros de la liga: tasas por equipo (total y a puerta) + tiradores por aparición.
+
+    Datos de la ingesta ESPN (stats_partido); el modelo corre en el request.
+    """
+    if liga not in LIGAS_VALIDAS:
+        raise HTTPException(400, f"liga debe ser una de {LIGAS_VALIDAS}")
+
+    filas = filas_de_liga(session, liga)
+    crews = tiros.equipos_tiros(filas)
+    nombres = _apodo_map(session, set(crews))
+    equipos = [
+        TirosEquipoTemporada(
+            equipo_id_api=eid,
+            nombre=nombres.get(eid, str(eid)),
+            partidos=c["partidos"],
+            tiros=c["tiros"],
+            a_puerta=c["a_puerta"],
+            tasa_tiros=c["tasa_tiros"],
+            tasa_a_puerta=c["tasa_a_puerta"],
+        )
+        for eid, c in sorted(crews.items(), key=lambda kv: (-kv[1]["tiros"], kv[0]))
+    ]
+    tiradores = [
+        TiradorLiga(
+            nombre=t["nombre"],
+            tiros=t["tiros"],
+            apariciones=t["apariciones"],
+            tasa=t["tasa"],
+            equipo=nombres.get(t["equipo_id_api"], str(t["equipo_id_api"])),
+            equipo_id_api=t["equipo_id_api"],
+        )
+        for t in tiros.tiradores_liga(filas)
+    ]
+    return TirosLiga(
+        liga=liga,
+        cobertura=_cobertura_de(session, liga, _completos_dominio(filas, tiros.bloques_de)),
+        calidad=_calidad_a_lineas(tiros.calidad_a_lineas(tiros.calidad_de_filas(filas))),
+        equipos=equipos,
+        tiradores=tiradores,
+        notas=NOTAS_TIROS,
+    )
+
+
+@app.get("/partido/{partido_id_api}/tiros", response_model=TirosPartido, tags=["stats"])
+def tiros_partido(partido_id_api: int, session: Sesion) -> TirosPartido:
+    """Tiros de UN partido: reales (si jugado) + prediccion walk-forward + tiradores."""
+    local = aliased(Equipo)
+    visita = aliased(Equipo)
+    fila_p = session.execute(
+        select(Partido, local, visita)
+        .join(local, local.id_api == Partido.id_local)
+        .join(visita, visita.id_api == Partido.id_visitante)
+        .where(Partido.id_api == partido_id_api)
+    ).first()
+    if fila_p is None:
+        raise HTTPException(404, "partido no encontrado en la BD")
+    partido, eq_local, eq_visita = fila_p
+    liga = partido.liga
+    filas = filas_de_liga(session, liga)
+
+    propia = next((f for f in filas if f["partido"] == partido.id_api), None)
+    reales: dict[str, TirosLadoReal] | None = None
+    if propia is not None:
+        bl, bv = tiros.bloques_de(propia)
+        if bl is not None and bv is not None:
+            reales = {
+                "local": TirosLadoReal(
+                    total=tiros.total_de(bl),
+                    a_puerta=tiros.a_puerta_de(bl),
+                ),
+                "visitante": TirosLadoReal(
+                    total=tiros.total_de(bv),
+                    a_puerta=tiros.a_puerta_de(bv),
+                ),
+            }
+
+    prediccion = tiros.prediccion_de_filas(filas, partido.id_local, partido.id_visitante, partido.utc_date)
+    tiradores = {
+        "local": [TiradorJugador(**t) for t in tiros.tiradores_equipo(filas, partido.id_local)],
+        "visitante": [TiradorJugador(**t) for t in tiros.tiradores_equipo(filas, partido.id_visitante)],
+    }
+
+    notas = list(NOTAS_TIROS)
+    if partido.estado in ESTADOS_POR_JUGAR:
+        notas.insert(0, "partido por jugar: solo prediccion")
+    elif reales is None:
+        notas.insert(0, "este partido aun no tiene datos ESPN (backfill en curso)")
+
+    return TirosPartido(
+        partido_id_api=partido.id_api,
+        liga=liga,
+        fecha_utc=partido.utc_date,
+        estado=partido.estado,
+        jornada=partido.jornada,
+        local=eq_local.nombre,
+        visitante=eq_visita.nombre,
+        fuente="espn" if propia is not None else None,
+        cobertura=_cobertura_de(session, liga, _completos_dominio(filas, tiros.bloques_de)),
+        calidad=_calidad_a_lineas(tiros.calidad_a_lineas(tiros.calidad_de_filas(filas))),
+        reales=reales,
+        prediccion=prediccion,
+        tiradores=tiradores,
+        notas=notas,
+    )
+
+
+@app.get("/cornes", response_model=CornesLiga, tags=["stats"])
+def cornes_liga(
+    session: Sesion,
+    liga: Annotated[str, Query(min_length=2, max_length=3)],
+) -> CornesLiga:
+    """Cornes de la liga: tasas por equipo encogidas + calidad walk-forward."""
+    if liga not in LIGAS_VALIDAS:
+        raise HTTPException(400, f"liga debe ser una de {LIGAS_VALIDAS}")
+
+    filas = filas_de_liga(session, liga)
+    crews = cornes.equipos_cornes(filas)
+    nombres = _apodo_map(session, set(crews))
+    equipos = [
+        CornesEquipoTemporada(
+            equipo_id_api=eid,
+            nombre=nombres.get(eid, str(eid)),
+            partidos=c["partidos"],
+            cornes=c["cornes"],
+            tasa=c["tasa"],
+        )
+        for eid, c in sorted(crews.items(), key=lambda kv: (-kv[1]["cornes"], kv[0]))
+    ]
+    return CornesLiga(
+        liga=liga,
+        cobertura=_cobertura_de(session, liga, _completos_dominio(filas, cornes.bloques_de)),
+        calidad=_calidad_a_lineas(cornes.calidad_de_filas(filas)),
+        equipos=equipos,
+        notas=NOTAS_CORNES,
+    )
+
+
+@app.get("/partido/{partido_id_api}/cornes", response_model=CornesPartido, tags=["stats"])
+def cornes_partido(partido_id_api: int, session: Sesion) -> CornesPartido:
+    """Cornes de UN partido: reales (si jugado) + prediccion walk-forward."""
+    local = aliased(Equipo)
+    visita = aliased(Equipo)
+    fila_p = session.execute(
+        select(Partido, local, visita)
+        .join(local, local.id_api == Partido.id_local)
+        .join(visita, visita.id_api == Partido.id_visitante)
+        .where(Partido.id_api == partido_id_api)
+    ).first()
+    if fila_p is None:
+        raise HTTPException(404, "partido no encontrado en la BD")
+    partido, eq_local, eq_visita = fila_p
+    liga = partido.liga
+    filas = filas_de_liga(session, liga)
+
+    propia = next((f for f in filas if f["partido"] == partido.id_api), None)
+    reales: dict[str, CornesLadoReal] | None = None
+    if propia is not None:
+        bl, bv = cornes.bloques_de(propia)
+        if bl is not None and bv is not None:
+            reales = {
+                "local": CornesLadoReal(total=cornes.total_de(bl)),
+                "visitante": CornesLadoReal(total=cornes.total_de(bv)),
+            }
+
+    prediccion = cornes.prediccion_de_filas(filas, partido.id_local, partido.id_visitante, partido.utc_date)
+
+    notas = list(NOTAS_CORNES)
+    if partido.estado in ESTADOS_POR_JUGAR:
+        notas.insert(0, "partido por jugar: solo prediccion")
+    elif reales is None:
+        notas.insert(0, "este partido aun no tiene datos ESPN (backfill en curso)")
+
+    return CornesPartido(
+        partido_id_api=partido.id_api,
+        liga=liga,
+        fecha_utc=partido.utc_date,
+        estado=partido.estado,
+        jornada=partido.jornada,
+        local=eq_local.nombre,
+        visitante=eq_visita.nombre,
+        fuente="espn" if propia is not None else None,
+        cobertura=_cobertura_de(session, liga, _completos_dominio(filas, cornes.bloques_de)),
+        calidad=_calidad_a_lineas(cornes.calidad_de_filas(filas)),
+        reales=reales,
+        prediccion=prediccion,
         notas=notas,
     )
 
