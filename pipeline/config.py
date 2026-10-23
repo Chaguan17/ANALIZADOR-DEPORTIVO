@@ -22,11 +22,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(REPO_ROOT / ".env")
 
 API_BASE_URL = "https://api.football-data.org/v4"
-API_TOKEN = os.environ.get("FOOTBALL_API_KEY", "")
+# .strip() en runtime de CI: si el secret se pegó con espacios/newline arrastrados,
+# el header Authorization saldría sucio (401 o "Illegal header value").
+API_TOKEN = os.environ.get("FOOTBALL_API_KEY", "").strip()
 if not API_TOKEN:
     raise RuntimeError(
-        "FOOTBALL_API_KEY no está definida. Copia .env.example → .env y rellénala "
-        "(regístrate gratis en https://www.football-data.org/client/register)."
+        "FOOTBALL_API_KEY no está definida. Local: copia .env.example → .env y "
+        "rellénala (https://www.football-data.org/client/register). "
+        "Cron (Fase 12): defínela como secret FOOTBALL_API_KEY en "
+        "GitHub → Settings → Secrets and variables → Actions."
     )
 
 # Temporada por año de INICIO de temporada europea (2026-27). Fijada explícitamente

@@ -52,22 +52,36 @@ jobs:
       - name: Instalar dependencias (pins idénticos a CI y local)
         run: pip install -r backend/requirements.txt
 
-      - name: 1/6 Ingesta football-data.org (raw + transform, pacing 10 req/min)
+      # Sanidad de inyección: verifica que los secrets llegaron y reporta
+      # métricas seguras (LONGITUD + esquema del DSN) sin exponerlos jamás.
+      - name: 0/7 Sanidad de secrets (sin exponer valores)
+        run: |
+          if [ -z "$FOOTBALL_API_KEY" ]; then echo "X FOOTBALL_API_KEY VACIA/AUSENTE"; exit 1; fi
+          if [ -z "$DATABASE_URL" ]; then echo "X DATABASE_URL VACIA/AUSENTE"; exit 1; fi
+          echo "OK FOOTBALL_API_KEY len=${#FOOTBALL_API_KEY}"
+          echo "OK DATABASE_URL len=${#DATABASE_URL}"
+          echo "esquema: ${DATABASE_URL%%://*}://...  (esperado: postgresql+psycopg)"
+          case "$DATABASE_URL" in
+            postgresql+psycopg://*) echo "OK formato SQLAlchemy+psycopg" ;;
+            *) echo "X formato inesperado del DSN (debe ser postgresql+psycopg://...)"; exit 1 ;;
+          esac
+
+      - name: 1/7 Ingesta football-data.org (raw + transform, pacing 10 req/min)
         run: python -m pipeline --refresh
 
-      - name: 2/6 Carga idempotente a Postgres (local → Neon)
+      - name: 2/7 Carga idempotente a Postgres (local → Neon)
         run: python -m backend.app.load
 
-      - name: 3/6 Baseline Poisson doble — predicciones vivas
+      - name: 3/7 Baseline Poisson doble — predicciones vivas
         run: python -m backend.app.modelo --todas --guardar
 
-      - name: 4/6 Dixon-Coles — evaluación + predicciones vivas
+      - name: 4/7 Dixon-Coles — evaluación + predicciones vivas
         run: python -m backend.app.modelo_dc --todas --guardar --vivas
 
-      - name: 5/6 LightGBM — evaluación + predicciones vivas
+      - name: 5/7 LightGBM — evaluación + predicciones vivas
         run: python -m backend.app.modelo_lgbm --todas --guardar --vivas
 
-      - name: 6/6 Evaluación walk-forward acumulada del baseline
+      - name: 6/7 Evaluación walk-forward acumulada del baseline
         run: python -m backend.app.evaluacion --todas --guardar
 
       - name: Auditoría final — conteos de la BD (el log queda en Actions)
