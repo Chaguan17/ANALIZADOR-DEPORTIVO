@@ -939,8 +939,72 @@ Fase 14 (portafolio) cuando el dueño quiera.
 
 **Siguientes pasos:**
 1. Opcional (decisión futura del dueño): propagar el lenguaje n-* a las
-   otras páginas (Torneo/Rankings en noche) — hoy NO se hizo por alcance.
-2. Fase 14 — CIERRE Y PORTAFOLIO: README con badges/diagrama + e2e opcional.
+   otras páginas (Torneo/Rankings en noche) - hoy NO se hizo por alcance.
+2. Fase 14 - CIERRE Y PORTAFOLIO: README con badges/diagrama + e2e opcional.
+
+---
+
+## Sesión 16 — 2026-10-23 — Fase 14: home v2 «partido-protagonista» + motor de escenario
+
+**Qué se hizo:**
+- Crítica del dueño aceptada y puesta en plan: la home anterior daba el
+  protagonismo a los modelos (el sello de firmas dominaba la tarjeta) y el
+  dueño pidió además nuevos parámetros (tarjetas, tiros, cornes,
+  recomendación por escenario). Decisiones cerradas en plan: rediseño v2
+  partido-protagonista; tarjetas = Fase 15 completa con modelo; tiros =
+  Fase 16 vía Understat (`understatapi`, gratuita, sin clave; API-Football
+  descartada por paga, Opta Analyst descartada por editorial, StatsBomb
+  Open Data solo histórico); **cornes FUERA de alcance** (ninguna fuente
+  gratuita entrega cornes de la temporada vigente → predicción no
+  verificable en vivo contradice el walk-forward); la antigua «Fase 14 —
+  Cierre y portafolio» pasa a Fase 17 (renumeración en el PLANO).
+- **Motor de escenario** `web/lib/escenario.ts` (función PURA, cero
+  backend nuevo): consenso 1/X/2 = promedio simple de las voces que
+  emiten; λ combinada promedio de voces; over/under 2.5 promedio; marcador
+  de la primera voz que lo emite; divergencia = firmas con letras
+  distintas. Reglas por prioridad: pendiente → con goles (λ ≥ 2.8 y
+  over ≥ 55%) → cerrado (λ ≤ 2.2) → favorito (dominante ≥ 55%) → dividido
+  → equilibrado. Devuelve {tono, frase, clave, consenso, dominante,
+  dividido, lambdaGoles, marcador}.
+- **Boletín v2** (`web/app/page.tsx`): meta → matchup grande → frase de
+  escenario con la cifra en ORO (único acento de la noche) → UNA barra de
+  consenso 1/X/2 → chips mini (λ goles · marcador) → `<details>` «Las tres
+  voces» con barras por voz + sello de firmas + puntito de divergencia +
+  rótulo «unánime». El sello unánime pierde el oro (queda tiza con borde
+  firme): la unanimidad la dice el TEXTO del summary. Estructura:
+  `<article>` con el Link del cuerpo y el `<details>` HERMANO (un toggle
+  dentro del Link navegaría al partido al plegar/desplegar).
+- CSS (`globals.css`): padding del boletín → hijos (n-boletin-cuerpo +
+  n-voces-detalle); clases nuevas n-rec/n-rec-clave/n-consenso/n-chips/
+  n-voces-detalle (chevrón CSS sin JS); esqueleto recalculado a la nueva
+  jerarquía (n-skel-rec/cons/chip-mini/detalle); cartel y leyenda v2.
+- `/partido/[id]`, torneo, precisión y demás rutas intactas.
+
+**Verificación:** npm lint limpio + `next build` verde (10 rutas; / en
+streaming como antes). Push `2d78d48` → CI backend + web VERDE; humo en
+producción: home 200 con la frase de escenario y la consenso única,
+/torneo y /precision sin fuga de tema (verificado tras push).
+
+**Lecciones de sesión:**
+- Cambiar el héroe fue SOLO jerarquía: los datos ya viajaban en
+  `/fixtures` (λ, O2.5, marcador); el motor vive en la web y el backend
+  no se tocó. La recomendación por escenario NO requería modelo nuevo,
+  sino lectura de los que existen.
+- El oro escaso funciona: un solo acento por tarjeta (la cifra del
+  escenario) baja el ruido y la unanimidad/divergencia sobreviven de
+  tiza y estructura.
+- `<details>` dentro de `<Link>` navega al pulsarlo: article > Link +
+  details hermanos es la fórmula sin JS.
+
+**Siguientes pasos:**
+1. Fase 15 (tarjetas): ingesta bookings + alineaciones → tasas con
+   shrinkage → Poisson O/U + jugadores a riesgo → endpoints → web → paso
+   del cron con presupuesto.
+2. Fase 16 (tiros con Understat): diccionario de equipos → adapter
+   `pipeline/tiros.py` → `backend/app/tiros.py` → endpoints/web → los
+   tiros reales bajan del mismo lugar, la evaluación entra al torneo.
+3. Higiene del dueño (sin bloqueo): password Neon, borrar NEOM_API_KEY,
+   actions modernizables.
 
 
 

@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-22 (Sesión 8)
+> Última actualización: 2026-10-23 (Sesión 16 — renumeración: antigua Fase 14 → Fase 17)
 
 ---
 
@@ -124,7 +124,70 @@
       40.5% · ll 1.0635/1.0594/1.0791) y humo en producción: API `/torneo`
       200 + web `/torneo` 200 tras `4757c29` (CI verde ×2, 40 passed)
 
-## FASE 14 — CIERRE Y PORTAFOLIO (opcional/elevar)
+## FASE 14 — ESCENARIO + REDISEÑO V2 «PARTIDO-PROTAGONISTA» (web)
+> Renumeración (2026-10-23, desviación documentada): el dueño pidió rediseño
+> v2 + tarjetas + tiros con fuente gratuita → la antigua «FASE 14 — CIERRE Y
+> PORTAFOLIO» pasa a ser la FASE 17 (última). Tarjetas = 15, Tiros = 16.
+- [x] Motor de escenario `web/lib/escenario.ts` (función PURA, cero backend
+      nuevo): consenso 1/X/2 = promedio simple de las voces · λ combinada ·
+      over/under 2.5; reglas por prioridad → pendiente · con goles (λ≥2.8 y
+      over≥55%) · cerrado (λ≤2.2) · favorito (dominante≥55%) · dividido ·
+      equilibrado (2026-10-23)
+- [x] Boletín v2: meta → matchup grande → frase de escenario con la cifra
+      en ORO (único acento) → UNA barra de consenso → chips mini (λ goles ·
+      marcador probable) (2026-10-23)
+- [x] «Las tres voces» pliegue en `<details>` con barras por voz, sello de
+      firmas, puntito de divergencia y rótulo «unánime»; el sello deja el
+      oro (tiza firme) y el `<details>` es hermano del Link para que el
+      toggle no navegue (2026-10-23)
+- [x] CSS `n-*` reajustado (padding a hijos, n-rec/n-consenso/n-chips/
+      n-voces-detalle) + esqueleto recalculado + cartel y leyenda v2
+      (2026-10-23)
+- [x] Verificación: lint + next build verdes · CI · humo producción
+      (2026-10-23)
+
+## FASE 15 — TARJETAS: INGESTA → TASAS → MODELO (backend + web)
+> Fuente: football-data.org `bookings` en el DETALLE de cada partido
+> (GET /v4/matches/{id}, 1 req por partido). Alineaciones del mismo request
+> → apariciones por jugador.
+- [ ] Ingesta del detalle: `bookings` (amarillas/rojas con jugador y
+      minuto) + alineaciones → `stats_partido`; backfill por lotes
+      (~40/corrida del cron, pausa >6 s por el límite 10 req/min)
+- [ ] `backend/app/tarjetas.py` (puro): tasas por equipo (local/visita)
+      con shrinkage hacia la media de liga + propensión por jugador
+      (casamiento por nombre+equipo, normalización; riesgo de duplicados
+      documentado)
+- [ ] Modelo: Poisson O/U tarjetas 2.5 y 3.5 + top jugadores a riesgo
+      («provisional» hasta completar el backfill); las rojas se registran,
+      no se modelan
+- [ ] Endpoints `GET /partido/{id}/tarjetas` y `GET /tarjetas?liga=` +
+      sección web + paso del cron con presupuesto de requests + pruebas
+
+## FASE 16 — TIROS CON UNDERSTAT (fuente gratuita secundaria)
+> Fuente: `understatapi` (scraping de understat.com, sin clave): ligas
+> PL/PD/SA/BL1 (+L1/RFPL), temporada vigente, tiros por partido con
+> jugador/minuto/xG/resultado. SIN Champions League → «—» honesto.
+> «A puerta» = gol + parado (derivado del resultado del tiro).
+- [ ] Adapter `pipeline/tiros.py`: diccionario auditable de nombres de
+      equipos Understat ↔ football-data (~100 equipos, 4 ligas del MVP)
+- [ ] Ingesta por partido (1 request): tiros totales / a puerta / xG y
+      desglose por jugador → `stats_partido`; backfill ~330 partidos en
+      lotes ~40/corrida + incremental; los tiros REALES de los jugados
+      también bajan → sus predicciones se evalúan walk-forward y entran
+      al torneo vivo
+- [ ] `backend/app/tiros.py` (puro): tasas por equipo (local/visita,
+      total y a puerta, shrinkage) + ranking de tiradores (SoT/aparición)
+- [ ] Endpoints `GET /partido/{id}/tiros` y `GET /tiros?liga=` + sección
+      web + paso del cron + pruebas + pin de `understatapi` en
+      requirements
+- [x] **Cornes: FUERA DE ALCANCE** (decisión del dueño, 2026-10-23) —
+      ninguna fuente gratuita entrega cornes de la temporada vigente
+      (Understat no los tiene; StatsBomb Open Data solo histórico;
+      Opta Analyst es editorial sin API) → una predicción de cornes no
+      sería verificable en vivo y contradice el walk-forward; nota
+      honesta en la web y tablas ya preparadas
+
+## FASE 17 — CIERRE Y PORTAFOLIO (antigua Fase 14, renumerada 2026-10-23)
 - [ ] README final: badges, diagrama de arquitectura, link al dashboard vivo
 - [ ] Playwright e2e (opcional) · Dependabot · dependencias al día
 - [ ] Ideas futuras: valor esperado vs cuotas, más ligas, LSTM
