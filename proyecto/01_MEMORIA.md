@@ -2,7 +2,7 @@
 
 > **Documento vivo.** Cada sesión de trabajo añade su entrada AL FINAL (las más viejas arriba).
 > Formato: fecha · qué se hizo · problemas/decisiones · siguientes pasos.
-> Última actualización: 2026-10-22
+> Última actualización: 2026-10-23
 
 ---
 
@@ -700,6 +700,100 @@ pública. Dashboard README actualizado con la sección "☁️ Despliegue".
    `FOOTBALL_API_KEY` como GitHub Secrets (el primer uso real del repo
    securizado contra la BD en producción) + puertas anti-solapamiento y
    auditables en Actions.
+
+---
+
+## Sesión 13 · 2026-10-23 · FASE 12 COMPLETA (pipeline de datos programado — cron cada 6 h)
+
+**Qué se hizo:**
+- `.github/workflows/data-refresh.yml` — workflow "Data Refresh", el corazón
+  operativo del proyecto: cron `17 */6 * * *` (minuto 17 para esquivar la
+  congestión de runners en ":00"; UTC → 00:17/06:17/12:17/18:17) + botón
+  manual `workflow_dispatch` · `permissions: contents: read` · `concurrency`
+  anti-solapamiento (encola el siguiente, no pelea por la BD) · job
+  `timeout-minutes: 35` · secrets FOOTBALL_API_KEY + DATABASE_URL inyectados
+  a nivel de job.
+- Cadena 0/7…7/7: **0/7 sanidad de secrets** (comprueba que ambos llegan
+  no-vacíos; imprime LONGITUD y esquema del DSN sin exponerlos jamás) →
+  **1/7** `python -m pipeline --refresh` (20 requests, pacing 6.2 s, ~2 min)
+  → **2/7** `python -m backend.app.load` (upserts idempotentes) → **3/7**
+  baseline `modelo --todas --guardar` → **4/7** `modelo_dc --todas --guardar
+  --vivas` → **5/7** `modelo_lgbm --todas --guardar --vivas` → **6/7**
+  `evaluacion --todas --guardar` → **7/7 auditoría final** (python heredoc:
+  conteos de `partidos`/`prediccion`/`reales_vs_previsto` + `assert` de las
+  3 tablas no vacías; el log queda en Actions como evidencia auditable).
+- **Dry-run end-to-end contra Neon ANTES de pushear** (mismo DSN que Render,
+  `.venv` del repo — Docker Desktop apagado, regla del dueño): ingesta 20
+  requests ~2 min; carga 0 duplicados (las PKs de la API ya estaban en BD);
+  DC 323 evaluaciones + 1.252 vivas; LGBM 291 evaluaciones + 1.252 vivas
+  (w re-tuneadas idénticas a Fase 5c: PD .10, PL .15, SA .35, BL1 .00,
+  CL .40); evaluación 323; **BD final idéntica** a la previa
+  (1.590/3.756/937 vía `/health` remoto) → idempotencia probada contra
+  producción antes de programar nada.
+- README: badge **Data Refresh** colocado en el asiento reservado desde la
+  Fase 10.
+- Blindaje de producción: `pipeline/config.py` añade `API_TOKEN.strip()`
+  (desactiva espacios/saltos pegados por accidente en el secret) y el
+  mensaje de error documenta la ruta GitHub Secrets además del .env local.
+
+**El debugging del run #2 (lo interesante de esta fase):**
+- La 1.ª corrida (dispatch manual sobre `5f399e8`) murió en **17 s**: el paso
+  de la ingesta ni siquiera pudo completar 1 request con el pacing → la API
+  pública de steps (checkout/setup-python/pip ✓, ingesta ❌, resto skipped)
+  + las líneas rojas del dueño lo dijeron todo: **`ModuleNotFoundError: No
+  module named 'httpx'`** en `pipeline/ingest.py:21` al importar.
+- Causa raíz: `httpx` NO estaba en `backend/requirements.txt` — el `.venv`
+  la tenía huérfana (`pip show` → `Required-by:` vacío: quedó instalada en
+  su día sin rastro en el requirements). El dry-run pasó solo porque corría
+  CON el venv completo y la CI nunca importa el pipeline (hueco ciego por
+  diseño). El runner es limpio: SOLO existe lo pineado.
+- Correcciones en serie: pins `httpx==0.28.1` + `numpy==2.5.4` (numpy la
+  importa `modelo_lgbm` directo y solo llegaba transitiva de lightgbm) ·
+  `.strip()` en la key · paso 0/7 de sanidad (diagnóstico futuro sin pedir
+  logs a nadie).
+
+**Evidencia del cierre — corrida #3 (commit `4609a62`, dispatch manual):**
+los 9 pasos técnicos del job VERDE, **8 min 4 s** (17:53:59 → 18:02:03 UTC),
+badge del README `passing`. CI verde en los 4 commits de la fase (`5f399e8`,
+`ca0de49`, `4609a62`, `098c1d0` — el último con pulido del workflow:
+numeración 7/7 del paso final, typo del comentario y assert reforzado).
+
+**Lecciones de sesión:**
+1. **La dependencia transitiva de regalo**: un venv acumula paquetes que un
+   `requirements.txt` limpio jamás instalaría; el único entorno honesto es
+   uno despiezado de cero (el runner). Regla nueva: toda dep IMPORTADA
+   directamente se pinea aunque hoy llegue transitiva.
+2. La CI no ejecuta el pipeline → ningún test la habría pillado. El guardián
+   real es la cadena completa del propio workflow: dry-run local contra la
+   BD REAL (los mismos comandos que el cron) antes de pushear + run manual
+   de estreno.
+3. Quirk de PowerShell 5.1: `$env:X=''` ELIMINA la variable en vez de
+   asignarla vacía — un repro local de "secret ausente" requiere trucos
+   propios y no simula al runner de forma fiable.
+4. Los logs de Actions NO se leen anónimamente (403), pero `/runs` y
+   `/jobs/{id}` SÍ publican el estado paso a paso → diseñar los
+   autodiagnósticos del workflow para bastarse con eso (el 0/7 imprime
+   longitudes, jamás valores).
+5. Secrets: un espacio o salto de más al pegar produce la misma firma que
+   una "key inválida" — `.strip()` neutraliza la clase entera de fallos.
+
+**Estado tras Fase 12:** el sistema se alimenta SOLO — cada ~6 h (y a botón
+siempre disponible): API football-data.org → Neon → 3 modelos walk-forward →
+evaluación acumulada, y la web pública refleja el estado fresco sin que
+nadie toque nada. BD en el cierre: **1.590 partidos · 3.756 predicciones ·
+937 evaluaciones** (verificado vía `/health` tras el run #3).
+
+**Siguientes pasos:**
+1. Higiene del dueño (menor, sin prisa): ① Reset password de Neon → pegar el
+   nuevo DSN en Render → Environments y en el secret `DATABASE_URL` de
+   Actions ② borrar el secret sobrante `NEOM_API_KEY` ③ opcional:
+   modernizar `checkout@v4→v5` y `setup-python@v5→v6` (avisos de Node 20 —
+   cosméticos; GitHub ya los ejecuta en Node 24).
+2. Fase 13 — MOTOR DE PREDICCIONES: siguientes palancas de precisión según
+   el plano (fixtures con predicción con fecha, medición de aciertos al
+   confirmarse resultados — el cron ya alimenta los datos que el motor
+   necesita).
+
 
 
 

@@ -99,8 +99,16 @@
       saldada, dominio de producción en render.yaml)
 
 ## FASE 12 — PIPELINE DE DATOS PROGRAMADO (data-refresh.yml)
-- [ ] Workflow cron (cada ~6 h): API → transformar → Postgres (Neon) → features → predicciones
-- [ ] Logs auditables en la pestaña Actions · timeout · protección anti-solapamiento
+- [x] Workflow cron (cada ~6 h): API → transformar → Postgres (Neon) → features → predicciones
+- [x] Logs auditables en la pestaña Actions · timeout · protección anti-solapamiento
+- [x] Verificado: dry-run local contra Neon con la MISMA cadena del workflow
+      (ingesta 20 req ~2 min · carga 0 duplicados · 3 modelos + evaluación
+      → BD idéntica 1.590/3.756/937) + corrida real #3 del workflow en
+      Actions VERDE (9 pasos técnicos en `4609a62`, 8 min 4 s, badge
+      `passing`). El 1.er intento (run #2, murió en 17 s) destapó `httpx`
+      ausente en `requirements.txt` → pineado (`httpx==0.28.1`,
+      `numpy==2.5.4`) + `.strip()` en la API key + paso 0/7 que reporta
+      longitudes de secrets sin exponer valores
 
 ## FASE 13 — MOTOR DE PREDICCIONES
 - [ ] Pipeline: fixture futuro → features → modelos → tabla `predicciones` con fecha
