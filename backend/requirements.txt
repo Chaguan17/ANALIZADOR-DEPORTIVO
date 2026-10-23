@@ -7,6 +7,12 @@ fastapi==0.161.0
 pydantic==2.14.1
 uvicorn==0.54.0
 lightgbm==4.7.0
+# Pipeline de datos (Fase 12, cron del data-refresh): httpx la importa
+# pipeline/ (client.py, ingest.py) y numpy la importa modelo_lgbm. En el .venv
+# local llegaron "de regalo" (transitivas de lightgbm / instaladas a mano),
+# pero CI no ejecuta pipeline y el cron del runner sí → aquí se firman.
+httpx==0.28.1
+numpy==2.5.4
 # Herramientas de CI (Fase 10) — se usan en el workflow de GitHub Actions,
 # pinneadas aquí para que CI y local corran la MISMA versión:
 ruff==0.17.2
