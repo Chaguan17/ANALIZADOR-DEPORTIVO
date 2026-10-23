@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "nota": "Pares manuales del matcher ESPN→footbal-data (pipeline.espn.resolver_equipo los consulta ANTES de la contención de tokens). Solo se añade aquí lo que la contención no puede resolver: nombres con cero tokens compartidos o ambiguos dentro de la propia liga. Auditoría: python -m pipeline.espn mapear (debe salir exit 0).",
+    "criterios": {
+      "PD/Barcelona": "ESPN usa la forma corta 'Barcelona' (también es un token de 'RCD Espanyol de Barcelona' → ambiguo). Es FC Barcelona.",
+      "PD/Deportivo": "ESPN usa 'Deportivo' para el RC Deportivo de La Coruña (verificado contra crudos 2026-08-17, 09-13, 09-20, 10-16); el Deportivo Alavés aparece como 'Alavés'.",
+      "BL1/*": "ESPN usa formas inglesas/abreviadas (Bayern Munich, FC Cologne, Hamburg SV) sin tokens compartidos con los nombres legales de football-data (FC Bayern München, 1. FC Köln, Hamburger SV).",
+      "CL/*": "Nombres de ESPN con cero tokens compartidos con football-data: AEK Athens/PAE AEK, Slavia Prague/SK Slavia Praha, Sporting CP/Sporting Clube de Portugal."
+    }
+  },
+  "manual": {
+    "PD": {
+      "Barcelona": "FC Barcelona",
+      "Deportivo": "RC Deportivo La Coruña"
+    },
+    "BL1": {
+      "Bayern Munich": "FC Bayern München",
+      "FC Cologne": "1. FC Köln",
+      "Hamburg SV": "Hamburger SV"
+    },
+    "CL": {
+      "AEK Athens": "PAE AEK",
+      "Bayern Munich": "FC Bayern München",
+      "Slavia Prague": "SK Slavia Praha",
+      "Sporting CP": "Sporting Clube de Portugal"
+    }
+  }
+}

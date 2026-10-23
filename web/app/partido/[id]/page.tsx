@@ -5,8 +5,11 @@ import Barra1x2 from "@/components/Barra1x2";
 import {
   numDe,
   obtenerPredicciones,
+  obtenerTarjetas,
   type DatosExtra,
   type PrediccionesPartido,
+  type TarjetaJugador,
+  type TarjetasPartido,
 } from "@/lib/api";
 import { fechaDia, horaUtc, nombreModelo, num, pct } from "@/lib/formato";
 
@@ -47,6 +50,14 @@ async function Contenido(props: PageProps<"/partido/[id]">) {
   const primera = data.predicciones[0]?.datos ?? null;
   const idLocal = numDe(primera, "id_local");
   const idVisita = numDe(primera, "id_visitante");
+
+  // Sección ESPN (Fase 15): si la API falla la sección queda honestamente vacía.
+  let tarjetas: TarjetasPartido | null = null;
+  try {
+    tarjetas = await obtenerTarjetas(idNum);
+  } catch {
+    tarjetas = null;
+  }
 
   return (
     <div className="contenedor">
@@ -109,6 +120,8 @@ async function Contenido(props: PageProps<"/partido/[id]">) {
         modelo no emite esa salida (LightGBM v1 es solo 1X2) — en vez de
         inventarnos números, los dejamos honestamente vacíos.
       </p>
+
+      {tarjetas && <SeccionTarjetas t={tarjetas} />}
     </div>
   );
 }
@@ -217,4 +230,166 @@ function setColor(modelo: string): string {
   if (modelo === "poisson_doble") return "var(--voz-poisson-doble)";
   if (modelo === "poisson_dc") return "var(--voz-poisson-dc)";
   return "var(--voz-lightgbm-v1)";
+}
+
+/* ────────────── Tarjetas (Fase 15) — fuente ESPN, on-request ────────────── */
+
+function SeccionTarjetas({ t }: { t: TarjetasPartido }) {
+  return (
+    <section style={{ marginTop: "2.4rem" }}>
+      <h2 className="titulo-bloque">Tarjetas{t.fuente ? " · ESPN" : ""}</h2>
+      <p className="titulo-sub">
+        Total del partido (amarillas + rojas) desde una Poisson con las tasas
+        por equipo encogidas hacia la media de liga. Cobertura del dominio:
+        {` ${t.cobertura.con_datos}/${t.cobertura.jugados}`} jugados con datos
+        (el backfill avanza con el cron).
+      </p>
+
+      {t.prediccion && (
+        <div className="tabla-scroll">
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Predicción</th>
+                <th className="num">Valor</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="fila-modelo">
+                <td>Tarjetas esperadas (total)</td>
+                <td className="num">{num(t.prediccion.tarjetas_esperadas)}</td>
+              </tr>
+              <tr>
+                <td>Prob. over 2.5</td>
+                <td className="num">{pct(t.prediccion.prob_over_2_5)}</td>
+              </tr>
+              <tr>
+                <td>Prob. over 3.5</td>
+                <td className="num">{pct(t.prediccion.prob_over_3_5)}</td>
+              </tr>
+              <tr className="diag">
+                <td colSpan={2}>
+                  por equipo — local: {num(t.prediccion.por_equipo.local ?? null)} ·
+                  visitante: {num(t.prediccion.por_equipo.visitante ?? null)}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.reales && (
+        <div className="tabla-scroll" style={{ marginTop: "1rem" }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Real</th>
+                <th className="num">Amarillas</th>
+                <th className="num">Rojas</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="fila-modelo">
+                <td>{t.local}</td>
+                <td className="num">{t.reales.local.amarillas}</td>
+                <td className="num">{t.reales.local.rojas}</td>
+              </tr>
+              <tr>
+                <td>{t.visitante}</td>
+                <td className="num">{t.reales.visitante.amarillas}</td>
+                <td className="num">{t.reales.visitante.rojas}</td>
+              </tr>
+              <tr className="diag">
+                <td colSpan={3}>
+                  {filaDeTarjetas(t.reales.local, t.reales.visitante) ||
+                    "sin eventos asignados a jugador"}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.propensos && (
+        <div className="tabla-scroll" style={{ marginTop: "1rem" }}>
+          <table className="tabla">
+            <thead>
+              <tr>
+                <th>Propenso (por aparición)</th>
+                <th className="num">Tarjetas</th>
+                <th className="num">Jugados</th>
+                <th className="num">Tasa</th>
+              </tr>
+            </thead>
+            <tbody>
+              <LadoPropensos lado="local" titulo={t.local} filas={t.propensos.local} />
+              <LadoPropensos lado="visitante" titulo={t.visitante} filas={t.propensos.visitante} />
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {t.calidad.length > 0 && (
+        <p className="titulo-sub" style={{ marginTop: "1rem" }}>
+          Calidad walk-forward:{" "}
+          {t.calidad
+            .map(
+              (c) =>
+                `O/U ${c.linea}: ${c.aciertos}/${c.evaluados} (${pct(c.accuracy, 0)}) · MAE ${num(c.mae)}`,
+            )
+            .join(" · ")}
+        </p>
+      )}
+      <p className="titulo-sub">
+        notas: {t.notas.join(" · ")}
+      </p>
+    </section>
+  );
+}
+
+function LadoPropensos({
+  lado,
+  titulo,
+  filas,
+}: {
+  lado: string;
+  titulo: string;
+  filas: TarjetaJugador[];
+}) {
+  if (filas.length === 0) {
+    return (
+      <tr>
+        <td colSpan={4}>{titulo}: sin jugadores medibles todavía</td>
+      </tr>
+    );
+  }
+  return (
+    <>
+      <tr className="diag">
+        <td colSpan={4}>{lado === "local" ? "🏠" : "✈️"} {titulo}</td>
+      </tr>
+      {filas.map((f) => (
+        <tr key={f.nombre}>
+          <td>{f.nombre}</td>
+          <td className="num">{f.amarillas}</td>
+          <td className="num">{f.apariciones}</td>
+          <td className="num">
+            {f.tasa === null ? "—" : num(f.tasa)}
+          </td>
+        </tr>
+      ))}
+    </>
+  );
+}
+
+function filaDeTarjetas(
+  local: NonNullable<TarjetasPartido["reales"]>["local"],
+  visitante: NonNullable<TarjetasPartido["reales"]>["visitante"],
+): string {
+  const eventos = [...local.por_jugador, ...visitante.por_jugador]
+    .sort((a, b) => (a.minuto ?? 99) - (b.minuto ?? 99))
+    .map(
+      (e) => `${e.nombre} ${e.minuto != null ? `${e.minuto}'` : ""} (${e.tipo})`.trim(),
+    );
+  return eventos.join(" · ");
 }

@@ -143,6 +143,87 @@ export interface TorneoModelo {
   forma: TorneoForma[];
 }
 
+// ── Fase 15: tarjetas con stats ESPN (on-request; datos en stats_partido) ──
+
+export interface CalidadLinea {
+  linea: number;
+  evaluados: number;
+  aciertos: number;
+  accuracy: number | null;
+  mae: number | null;
+}
+
+export interface CoberturaEspn {
+  jugados: number;
+  con_datos: number;
+}
+
+export interface JugadorEvento {
+  nombre: string;
+  minuto: number | null;
+  tipo: string;
+}
+
+export interface TarjetaJugador {
+  nombre: string;
+  amarillas: number;
+  rojas: number;
+  apariciones: number;
+  tasa: number | null;
+}
+
+export interface TarjetaLadoReal {
+  amarillas: number;
+  rojas: number;
+  por_jugador: JugadorEvento[];
+}
+
+export interface PredTarjetas {
+  tarjetas_esperadas: number;
+  prob_over_2_5: number;
+  prob_over_3_5: number;
+  por_equipo: Record<string, number | null>;
+}
+
+export interface TarjetasPartido {
+  partido_id_api: number;
+  liga: string;
+  fecha_utc: string;
+  estado: string;
+  jornada: number | null;
+  local: string;
+  visitante: string;
+  fuente: string | null;
+  cobertura: CoberturaEspn;
+  calidad: CalidadLinea[];
+  reales: Record<"local" | "visitante", TarjetaLadoReal> | null;
+  prediccion: PredTarjetas | null;
+  propensos: Record<string, TarjetaJugador[]> | null;
+  notas: string[];
+}
+
+export interface TarjetaEquipoTemporada {
+  equipo_id_api: number;
+  nombre: string;
+  partidos: number;
+  tarjetas: number;
+  tasa: number;
+}
+
+export interface TarjetaJugadorLiga extends TarjetaJugador {
+  equipo: string;
+  equipo_id_api: number;
+}
+
+export interface TarjetasLiga {
+  liga: string;
+  cobertura: CoberturaEspn;
+  calidad: CalidadLinea[];
+  equipos: TarjetaEquipoTemporada[];
+  propensos: TarjetaJugadorLiga[];
+  notas: string[];
+}
+
 /** Lee un número del JSONB de diagnóstico (o null si no viaja). */
 export function numDe(o: DatosExtra | null, clave: string): number | null {
   if (!o) return null;
@@ -183,3 +264,9 @@ export const obtenerRankings = (liga: string) =>
 export const obtenerPrecision = () => jsonDe<MetricasModelo[]>("/model-accuracy");
 
 export const obtenerTorneo = () => jsonDe<TorneoModelo[]>("/torneo");
+
+export const obtenerTarjetasLiga = (liga: string) =>
+  jsonDe<TarjetasLiga>(`/tarjetas?liga=${liga}`);
+
+export const obtenerTarjetas = (idPartido: number) =>
+  jsonDe<TarjetasPartido>(`/partido/${idPartido}/tarjetas`);

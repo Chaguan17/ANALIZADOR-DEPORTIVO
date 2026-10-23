@@ -1,10 +1,16 @@
-# PIPELINE DE DATOS PROGRAMADO — Fase 12
+# PIPELINE DE DATOS PROGRAMADO — Fase 12, extendido en Fases 15-16
 #
 # REFRESCO COMPLETO cada ~6 h: API de football-data.org → JSON crudos+transform
 # → Postgres (Neon en producción) → predicciones de los 3 modelos vivos
 # (baseline Poisson doble · Dixon-Coles · LightGBM) → evaluación walk-forward
 # acumulada en reales_vs_previsto. TODO idempotente (upserts por PK de la API
 # y UNIQUE (partido, modelo)): re-corriendo con los mismos datos → mismo estado.
+#
+# Fases 15-16: con la BD fresca corre ADEMÁS la ingesta INCREMENTAL de ESPN
+# (tiros/tarjetas/cornes → stats_partido): presupuesto propio (~40 req),
+# pacing 2.5 s, exit SIEMPRE 0 (el cron no se pone rojo por una fuente no
+# oficial; la cobertura visible queda en la auditoría). Después de una
+# interrupción, el siguiente cron reanuda solito (el estado es la BD).
 #
 # Secretos requeridos (Settings → Secrets and variables → Actions):
 #   FOOTBALL_API_KEY — clave del free tier de football-data.org (la del .env local)
@@ -54,7 +60,7 @@ jobs:
 
       # Sanidad de inyección: verifica que los secrets llegaron y reporta
       # métricas seguras (LONGITUD + esquema del DSN) sin exponerlos jamás.
-      - name: 0/7 Sanidad de secrets (sin exponer valores)
+      - name: 0/8 Sanidad de secrets (sin exponer valores)
         run: |
           if [ -z "$FOOTBALL_API_KEY" ]; then echo "X FOOTBALL_API_KEY VACIA/AUSENTE"; exit 1; fi
           if [ -z "$DATABASE_URL" ]; then echo "X DATABASE_URL VACIA/AUSENTE"; exit 1; fi
@@ -65,26 +71,54 @@ jobs:
             postgresql+psycopg://*) echo "OK formato SQLAlchemy+psycopg" ;;
             *) echo "X formato inesperado del DSN (debe ser postgresql+psycopg://...)"; exit 1 ;;
           esac
+          # etiqueta DIA (UTC) para la clave del crudo ESPN: UNA entrada de
+          # cache por día; las corridas del MISMO día comparten snapshot y las
+          # del día siguiente arrancan del último snapshot (restore-keys).
+          echo "DIA_CACHE=$(date -u +%Y%m%d)" >> "$GITHUB_ENV"
 
-      - name: 1/7 Ingesta football-data.org (raw + transform, pacing 10 req/min)
+      - name: 1/8 Ingesta football-data.org (raw + transform, pacing 10 req/min)
         run: python -m pipeline --refresh
 
-      - name: 2/7 Carga idempotente a Postgres (local → Neon)
+      - name: 2/8 Carga idempotente a Postgres (local → Neon)
         run: python -m backend.app.load
 
-      - name: 3/7 Baseline Poisson doble — predicciones vivas
+      # Fases 15-16: ingesta INCREMENTAL de ESPN (tiros/tarjetas/cornes) —
+      # el estado es la BD (los partidos ya cargados arriba marcan lo faltante)
+      # y el ESTADO DEL CRUDO vive en el cache de Actions (el disco del runner
+      # es efímero): sin cache sería re-bajar ~140 scoreboards en CADA corrida
+      # y el presupuesto moriría ahí sin llegar a los summaries. Con cache
+      # cálido, una corrida normal solo baja los summaries de los partidos
+      # acabados desde la última (2.5 s de pacing al endpoint no oficial).
+      # Presupuesto 200: tolera las corridas frías (primer día, cache
+      # desalojado) sin cortarse; NUNCA falla el cron (exit 0 siempre).
+      - name: 3/8a Cache de crudos ESPN — restaurar snapshot del último día
+        uses: actions/cache@v4
+        with:
+          path: pipeline/raw/espn
+          key: espn-crudos-v1-${{ env.DIA_CACHE }}
+          restore-keys: |
+            espn-crudos-v1-
+
+      - name: 3/8b Ingesta incremental ESPN (tiros/tarjetas/cornes → stats_partido)
+        run: python -m backend.app.espn actualizar --limite 200
+
+      - name: 4/8 Baseline Poisson doble — predicciones vivas
         run: python -m backend.app.modelo --todas --guardar
 
-      - name: 4/7 Dixon-Coles — evaluación + predicciones vivas
+      - name: 5/8 Dixon-Coles — evaluación + predicciones vivas
         run: python -m backend.app.modelo_dc --todas --guardar --vivas
 
-      - name: 5/7 LightGBM — evaluación + predicciones vivas
+      - name: 6/8 LightGBM — evaluación + predicciones vivas
         run: python -m backend.app.modelo_lgbm --todas --guardar --vivas
 
-      - name: 6/7 Evaluación walk-forward acumulada del baseline
+      - name: 7/8 Evaluación walk-forward acumulada del baseline
         run: python -m backend.app.evaluacion --todas --guardar
 
-      - name: 7/7 Auditoría final — conteos de la BD (el log queda en Actions)
+      # LA auditoría NO falla si stats_partido va en 0: ESPN es no oficial y
+      # algún día puede negarse (429/403 sostenidos); el conteo visible en el
+      # log es la señal honesta, pero la corriente FD/models sigue siendo la
+      # base del proyecto y no debe ponerse roja por causa externa.
+      - name: 8/8 Auditoría final — conteos de la BD (el log queda en Actions)
         run: |
           python - <<'EOF'
           import os
@@ -95,10 +129,14 @@ jobs:
           with engine.connect() as c:
               conteos = {
                   t: c.execute(text(f"SELECT count(*) FROM {t}")).scalar()
-                  for t in ("partidos", "prediccion", "reales_vs_previsto")
+                  for t in ("partidos", "prediccion", "reales_vs_previsto", "stats_partido")
               }
           print("== RESUMEN BD tras el refresh ==")
           print(conteos)
+          print(
+              "NOTA: stats_partido muestra la cobertura de ESPN (Fases 15-16);",
+              "no se exige > 0 por ser fuente no oficial (regla del cron).",
+          )
           assert (
               conteos["partidos"] > 0
               and conteos["prediccion"] > 0

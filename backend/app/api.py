@@ -42,6 +42,15 @@ from .models import (
     Prediccion,
     RealesVsPrevisto,
 )
+from .stats_filas import filas_de_liga
+from .tarjetas import (
+    bloques_de,
+    calidad_de_filas,
+    equipos_tarjetas,
+    prediccion_de_filas,
+    propensos_equipo,
+    propensos_liga,
+)
 from .torneo import FORMA_POR_DEFECTO, construir_torneo, leer_ledger
 
 LIGAS_VALIDAS = ("PD", "PL", "SA", "BL1", "CL")
@@ -219,6 +228,108 @@ class TorneoModelo(BaseModel):
     o25: TorneoO25 | None
     por_liga: list[TorneoLiga]
     forma: list[TorneoForma]
+
+
+# ───────────── esquemas de tarjetas (Fase 15 — fuente ESPN) ────────────────
+
+
+class CalidadLinea(BaseModel):
+    """Calidad walk-forward para UNA línea over/under."""
+
+    linea: float
+    evaluados: int
+    aciertos: int
+    accuracy: float | None
+    mae: float | None
+
+
+class CoberturaEspn(BaseModel):
+    """Cobertura honesta del dominio respecto a los jugados de la liga."""
+
+    jugados: int
+    con_datos: int
+
+
+class JugadorEvento(BaseModel):
+    """Un evento de tarjeta real de la ficha del partido."""
+
+    nombre: str
+    minuto: int | None
+    tipo: str
+
+
+class TarjetaJugador(BaseModel):
+    """Jugador propenso a tarjeta (por APARICIÓN: ESPN no da minutos)."""
+
+    nombre: str
+    amarillas: int
+    rojas: int
+    apariciones: int
+    tasa: float | None
+
+
+class TarjetaLadoReal(BaseModel):
+    """Lo real de un lado (reportado; las rojas nunca van a la predicción)."""
+
+    amarillas: int
+    rojas: int
+    por_jugador: list[JugadorEvento]
+
+
+class PredTarjetas(BaseModel):
+    """La predicción del modelo de tarjetas para un partido."""
+
+    tarjetas_esperadas: float
+    prob_over_2_5: float
+    prob_over_3_5: float
+    por_equipo: dict[str, float | None]
+
+
+class TarjetasPartido(BaseModel):
+    """Todo lo que la web necesita para la sección de tarjetas de un partido."""
+
+    partido_id_api: int
+    liga: str
+    fecha_utc: datetime
+    estado: str
+    jornada: int | None
+    local: str
+    visitante: str
+    fuente: str | None
+    cobertura: CoberturaEspn
+    calidad: list[CalidadLinea]
+    reales: dict[str, TarjetaLadoReal] | None
+    prediccion: PredTarjetas | None
+    propensos: dict[str, list[TarjetaJugador]] | None
+    notas: list[str]
+
+
+class TarjetaEquipoTemporada(BaseModel):
+    """Resumen por equipo de la liga (la tabla de /tarjetas?liga)."""
+
+    equipo_id_api: int
+    nombre: str
+    partidos: int
+    tarjetas: int
+    tasa: float
+
+
+class TarjetaJugadorLiga(TarjetaJugador):
+    """Propenso con su equipo, para el ranking de liga."""
+
+    equipo: str
+    equipo_id_api: int
+
+
+class TarjetasLiga(BaseModel):
+    """La vista de liga completa del modelo de tarjetas."""
+
+    liga: str
+    cobertura: CoberturaEspn
+    calidad: list[CalidadLinea]
+    equipos: list[TarjetaEquipoTemporada]
+    propensos: list[TarjetaJugadorLiga]
+    notas: list[str]
 
 
 # ───────────────────────────────── endpoints ────────────────────────────────
@@ -558,6 +669,163 @@ def torneo(
     """
     aggs, formas_de = leer_ledger(session, forma)
     return [TorneoModelo(**t) for t in construir_torneo(aggs, formas_de)]
+
+
+# ─────────────── tarjetas (Fase 15 — datos ESPN, on-request) ────────────────
+
+NOTAS_TARJETAS = [
+    "modelo on-request: shrinkage hacia la media de liga + Poisson",
+    "las rojas no se predicen (evento raro); solo se reportan como reales",
+    "fuente de stats: ESPN (site.api.espn.com), API no oficial sin contrato",
+    "backfill ESPN en curso: la cobertura sube con cada corrida del cron",
+    "propensos calculados POR APARICION; ESPN no entrega minutos por jugador",
+]
+
+
+def _cobertura_de(session: Session, liga: str, con_datos: int) -> CoberturaEspn:
+    """(jugados, con datos) de la liga para la nota de cobertura honesta."""
+    jugados = session.scalar(
+        select(func.count(Partido.id_api)).where(
+            Partido.liga == liga, Partido.estado == "FINISHED"
+        )
+    )
+    return CoberturaEspn(jugados=jugados or 0, con_datos=con_datos)
+
+
+def _calidad_a_lineas(calidad: dict) -> list[CalidadLinea]:
+    return [
+        CalidadLinea(
+            linea=float(linea),
+            evaluados=r["evaluados"],
+            aciertos=r["aciertos"],
+            accuracy=r["accuracy"],
+            mae=r["mae"],
+        )
+        for linea, r in calidad["lineas"].items()
+    ]
+
+
+def _filas_completas(filas: list[dict]) -> int:
+    """Partidos con AMBOS lados de tarjetas completos (la cobertura cierta del dominio)."""
+    return sum(1 for f in filas if all(b is not None for b in bloques_de(f)))
+
+
+@app.get("/tarjetas", response_model=TarjetasLiga, tags=["stats"])
+def tarjetas_liga(
+    session: Sesion,
+    liga: Annotated[str, Query(min_length=2, max_length=3)],
+) -> TarjetasLiga:
+    """Tarjetas de la liga: tasas por equipo encogidas + propensos por aparicion.
+
+    Datos de la ingesta ESPN (stats_partido); el modelo corre en el request.
+    """
+    if liga not in LIGAS_VALIDAS:
+        raise HTTPException(400, f"liga debe ser una de {LIGAS_VALIDAS}")
+
+    filas = filas_de_liga(session, liga)
+    crews = equipos_tarjetas(filas)
+    nombres = _apodo_map(session, set(crews))
+    equipos = [
+        TarjetaEquipoTemporada(
+            equipo_id_api=eid,
+            nombre=nombres.get(eid, str(eid)),
+            partidos=c["partidos"],
+            tarjetas=c["tarjetas"],
+            tasa=c["tasa"],
+        )
+        for eid, c in sorted(crews.items(), key=lambda kv: (-kv[1]["tarjetas"], kv[0]))
+    ]
+    propensos = [
+        TarjetaJugadorLiga(
+            nombre=f["nombre"],
+            amarillas=f["amarillas"],
+            rojas=f["rojas"],
+            apariciones=f["apariciones"],
+            tasa=f["tasa"],
+            equipo=nombres.get(f["equipo_id_api"], str(f["equipo_id_api"])),
+            equipo_id_api=f["equipo_id_api"],
+        )
+        for f in propensos_liga(filas)
+    ]
+    return TarjetasLiga(
+        liga=liga,
+        cobertura=_cobertura_de(session, liga, _filas_completas(filas)),
+        calidad=_calidad_a_lineas(calidad_de_filas(filas)),
+        equipos=equipos,
+        propensos=propensos,
+        notas=NOTAS_TARJETAS,
+    )
+
+
+@app.get("/partido/{partido_id_api}/tarjetas", response_model=TarjetasPartido, tags=["stats"])
+def tarjetas_partido(partido_id_api: int, session: Sesion) -> TarjetasPartido:
+    """Tarjetas de UN partido: reales (si jugado) + prediccion walk-forward + propensos."""
+    local = aliased(Equipo)
+    visita = aliased(Equipo)
+    fila_p = session.execute(
+        select(Partido, local, visita)
+        .join(local, local.id_api == Partido.id_local)
+        .join(visita, visita.id_api == Partido.id_visitante)
+        .where(Partido.id_api == partido_id_api)
+    ).first()
+    if fila_p is None:
+        raise HTTPException(404, "partido no encontrado en la BD")
+    partido, eq_local, eq_visita = fila_p
+    liga = partido.liga
+    filas = filas_de_liga(session, liga)
+
+    propia = next((f for f in filas if f["partido"] == partido.id_api), None)
+    reales: dict[str, TarjetaLadoReal] | None = None
+    if propia is not None:
+        bl, bv = bloques_de(propia)
+        if bl is not None and bv is not None:
+            reales = {
+                "local": TarjetaLadoReal(
+                    amarillas=bl.get("amarillas") or 0,
+                    rojas=bl.get("rojas") or 0,
+                    por_jugador=[
+                        JugadorEvento(nombre=j["nombre"], minuto=j.get("minuto"), tipo=j["tipo"])
+                        for j in bl.get("por_jugador") or []
+                    ],
+                ),
+                "visitante": TarjetaLadoReal(
+                    amarillas=bv.get("amarillas") or 0,
+                    rojas=bv.get("rojas") or 0,
+                    por_jugador=[
+                        JugadorEvento(nombre=j["nombre"], minuto=j.get("minuto"), tipo=j["tipo"])
+                        for j in bv.get("por_jugador") or []
+                    ],
+                ),
+            }
+
+    prediccion = prediccion_de_filas(filas, partido.id_local, partido.id_visitante, partido.utc_date)
+    propensos = {
+        "local": [TarjetaJugador(**f) for f in propensos_equipo(filas, partido.id_local)],
+        "visitante": [TarjetaJugador(**f) for f in propensos_equipo(filas, partido.id_visitante)],
+    }
+
+    notas = list(NOTAS_TARJETAS)
+    if partido.estado in ESTADOS_POR_JUGAR:
+        notas.insert(0, "partido por jugar: solo prediccion")
+    elif reales is None:
+        notas.insert(0, "este partido aun no tiene datos ESPN (backfill en curso)")
+
+    return TarjetasPartido(
+        partido_id_api=partido.id_api,
+        liga=liga,
+        fecha_utc=partido.utc_date,
+        estado=partido.estado,
+        jornada=partido.jornada,
+        local=eq_local.nombre,
+        visitante=eq_visita.nombre,
+        fuente="espn" if propia is not None else None,
+        cobertura=_cobertura_de(session, liga, _filas_completas(filas)),
+        calidad=_calidad_a_lineas(calidad_de_filas(filas)),
+        reales=reales,
+        prediccion=prediccion,
+        propensos=propensos,
+        notas=notas,
+    )
 
 
 if __name__ == "__main__":
