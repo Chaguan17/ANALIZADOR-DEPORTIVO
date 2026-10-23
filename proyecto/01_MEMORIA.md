@@ -874,6 +874,75 @@ dueño (password Neon, NEOM_API_KEY, modernización de actions) y la Fase 14.
    al día; las ideas futuras quedan anotadas ahí (valor esperado vs cuotas,
    más ligas, LSTM).
 
+---
+
+## Sesión 15 · 2026-10-23 · REDISEÑO EDITORIAL de la home (skill frontend-design)
+
+**Qué se hizo (brief del dueño):** home "Próximos partidos" rediseñada —
+tema oscuro, estilo editorial de estadísticas deportivas, sin tocar la
+lógica de datos ni las rutas (obtenerFixtures, búsqueda por liga y las 7
+rutas idénticas).
+
+- Propuesta en 5 líneas ANTES de codificar (paleta · acento · fuentes ·
+  composición · estados) y revisada contra la guía de la skill (nada de
+  multicolor; la audacia gastada en UN solo sitio).
+- **Pizarra a página completa, scoped con `:has()`**: `body:has(main .noche)`
+  tiñe el lienzo SOLO cuando la página es la home — las otras 6 páginas
+  viven en papel claro sin un byte de cambio (verificado en producción).
+  Además `.noche` pinta su propio fondo como respaldo para browsers sin :has.
+- **Único acento: oro `#f0b429`** — brilla SOLO en el sello de firmas cuando
+  las tres voces firman el mismo 1/X/2 (el lema hecho color: "una sola
+  verdad"). División de voces = trazo rayado de tiza; sin datos = chip "—".
+- **Tres voces por boletín** (cambio de concepto): antes una VOZ elegida por
+  query (?modelo=…); ahora cada tarjeta muestra las tres barras 1|X|2
+  comparables por voz (tonos de tiza plena/media/baja, NO colores de
+  resultado reservados a las otras páginas) + sello con letra y probabilidad
+  de cada voz. El parámetro ?modelo= sigue parseándose sin efecto (enlaces
+  viejos no rompen); el selector de voz sale de la home y SelLiga queda con
+  enlace limpio ?liga=X (su parámetro modelo ahora es opcional).
+- Tipografía: Archivo Expanded 800 mayúsculas para el cartel + kicker de
+  liga en mono; Spline Sans Mono tabular en TODA cifra (fecha, hora, pct,
+  firmas). Los colores de voz sobreviven como micro-punto de identidad.
+- **Nav con estado activo**: componente cliente `NavActiva` (usePathname +
+  `NavLinks` presentacional como fallback) envuelto en `<Suspense>` —
+  exigido por cacheComponents (rutas con [id] dinámico: el pathname no se
+  resuelve en prerender; sin el Suspense el build fallaría). El shell sigue
+  estático y la marca activa hidrata en el cliente.
+- **Estados**: `SkeletonPartidos` (calca la parrilla; pulso CSS apagado con
+  prefers-reduced-motion; texto sr-only con role=status); vacío = "La
+  pizarra está en blanco" (n-estado); error = panel con borde rojo-tiza,
+  el código y el comando para despertar la API. Los componentes COMPARTIDOS
+  (Aviso, Cargando, Barra1x2) no se tocaron: otras páginas intactas.
+- Accesibilidad: barras con role=img y aria-label con los tres pct por voz;
+  sello con aria-label narrando las firmas; foco visible en oro scoped a
+  .noche; contraste AA (tiza #e9eee4 sobre #0c1613); boletines = <Link>
+  completos con hover por borde (sin transform decorativo).
+
+**Verificación:** npm lint + build limpios (rutas idénticas: / ◐ streaming);
+push `080d968` → CI backend+web VERDE; producción: home 200 con sello,
+boletines, lema, pie y nav a /torneo; /torneo y /precision 200 SIN clases
+noche (cero fuga de tema).
+
+**Lecciones de sesión:**
+- El `:has()` de CSS resuelve el theming por página sin tocar el layout ni
+  JS: un selector puede ser el fork visual de todo un sitio.
+- con cacheComponents, cualquier usePathname en el shell exige Suspense +
+  fallback; el fallback estático es también el SSR correcto (nav sin marca).
+- Rediseñar la home cambió el CONCEPTO (una voz elegida → las tres voces
+  firmando cada partido); el lema se volvió interfaz literal.
+- Componentes compartidos intactos + clases propias (n-*) desacoplan la
+  noche del resto del sitio.
+
+**Estado:** la home es el escaparate editorial del proyecto. Quedan: la
+higiene del dueño (password Neon, NEOM_API_KEY, actions modernizables) y la
+Fase 14 (portafolio) cuando el dueño quiera.
+
+**Siguientes pasos:**
+1. Opcional (decisión futura del dueño): propagar el lenguaje n-* a las
+   otras páginas (Torneo/Rankings en noche) — hoy NO se hizo por alcance.
+2. Fase 14 — CIERRE Y PORTAFOLIO: README con badges/diagrama + e2e opcional.
+
+
 
 
 
