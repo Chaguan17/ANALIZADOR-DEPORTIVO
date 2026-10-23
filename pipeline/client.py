@@ -18,11 +18,11 @@ import httpx
 
 from .config import (
     API_BASE_URL,
-    API_TOKEN,
     MAX_RETRIES,
     MIN_INTERVAL,
     RAW_DIR,
     TIMEOUT_S,
+    exigir_token,
 )
 
 
@@ -30,9 +30,12 @@ class FootballDataClient:
     """Cliente de la API v4 de football-data.org con caché cruda en disco."""
 
     def __init__(self, raw_dir: Path = RAW_DIR) -> None:
+        # Fail-fast aquí (punto de uso): construir el cliente es tocar la
+        # red → sí se exige credencial; importar módulos offline, no.
+        headers = {"X-Auth-Token": exigir_token(), "Accept": "application/json"}
         self._client = httpx.Client(
             base_url=API_BASE_URL,
-            headers={"X-Auth-Token": API_TOKEN, "Accept": "application/json"},
+            headers=headers,
             timeout=TIMEOUT_S,
         )
         self.raw_dir = raw_dir
