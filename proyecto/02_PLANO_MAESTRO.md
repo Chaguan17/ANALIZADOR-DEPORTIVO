@@ -111,8 +111,18 @@
       longitudes de secrets sin exponer valores
 
 ## FASE 13 — MOTOR DE PREDICCIONES
-- [ ] Pipeline: fixture futuro → features → modelos → tabla `predicciones` con fecha
-- [ ] Medición de aciertos al confirmarse resultados (ranking vivo del modelo)
+- [x] Pipeline: fixture futuro → features → modelos → tabla `predicciones` con fecha
+- [x] Medición de aciertos al confirmarse resultados (ranking vivo del modelo)
+- [x] Verificado: la 1.ª pieza la trae el cron de la Fase 12 (cada corrida
+      deja TODAS las vivas en `prediccion` con la fecha del partido —
+      1.252 × 3 modelos; la tabla se llama `prediccion` y no `predicciones`,
+      desviación registrada en CONTEXTO desde la Fase 3). El ranking vivo:
+      `backend/app/torneo.py` (agregado puro, 7 pruebas) + endpoint `/torneo`
+      + página web `/torneo` (tabla del torneo, mando por liga y forma viva
+      ✓/✗), todos leyendo el ledger `reales_vs_previsto` que el cron
+      refresca. Números cruzados con Fases 7/5b/5c EXACTOS (45.2%/44.6%/
+      40.5% · ll 1.0635/1.0594/1.0791) y humo en producción: API `/torneo`
+      200 + web `/torneo` 200 tras `4757c29` (CI verde ×2, 40 passed)
 
 ## FASE 14 — CIERRE Y PORTAFOLIO (opcional/elevar)
 - [ ] README final: badges, diagrama de arquitectura, link al dashboard vivo

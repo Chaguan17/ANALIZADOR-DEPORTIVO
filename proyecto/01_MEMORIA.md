@@ -794,6 +794,87 @@ nadie toque nada. BD en el cierre: **1.590 partidos · 3.756 predicciones ·
    confirmarse resultados — el cron ya alimenta los datos que el motor
    necesita).
 
+---
+
+## Sesión 14 · 2026-10-23 · FASE 13 COMPLETA (torneo de los modelos — ranking vivo)
+
+**Qué se hizo:**
+- Auditoría de BD que fijó el diseño: `prediccion` contiene SOLO vivas
+  (SCHEDULED 638 + TIMED 614 × 3 modelos — cero filas sobre partidos
+  FINISHED en las 5 ligas: 89 PD / 70 PL / 70 SA / 54 BL1 / 54 CL). La
+  pizarra de próximos y el archivo de aciertos son tablas distintas por
+  diseño; el archivo de promesas confirmadas es `reales_vs_previsto` (el
+  ledger walk-forward que el cron refresca). Por eso el ranking vivo se
+  construyó sobre el LEDGER, sin inventar una tabla nueva.
+- `backend/app/torneo.py`:
+  - `construir_torneo(aggs, formas)` — builder PURA: totales por modelo =
+    suma por liga; log loss/Brier como promedio ponderado por n (equivale
+    exacto a la media directa); over/under 2.5 contado SOLO en las filas
+    que emiten la probabilidad (del JSONB `datos.acierto_over25`;
+    LightGBM v1 no la emite → `o25: null` honesto con su «—» en la web).
+    Orden del podio: mayor accuracy 1X2 · desempate por más evaluados ·
+    orden de nacimiento (poisson_doble antes que dc).
+  - `leer_ledger(session, n_forma)`: un SELECT agregado por (modelo, liga)
+    (COUNT FILTER / JSONB paths con `.as_boolean()`) + 3 SELECTS de forma
+    (últimos N por voz, nombres de equipos vía `aliased`), filas con
+    resultado real, favorito elegido y el costo log loss del fallo.
+  - CLI: `python -m backend.app.torneo [--forma N]` (tabla de consola con
+    ✓/✗ por partido).
+- `api.py`: contratos Pydantic (TorneoModelo/O25/Forma/Liga) + endpoint
+  `GET /torneo?forma=N` (default 8, techo 25; `[]` honesto si el ledger
+  está vacío) — la página no miente cuando no hay torneo.
+- 7 pruebas puras en `backend/tests/test_torneo.py`: tasas None-safe,
+  ponderados, O2.5 solo-quien-emite, orden por liga del MVP, podio con
+  desempates y ledger vacío → `[]` (CI total: 40 passed).
+- Web: contratos TS 1:1 + página `/torneo` (nav "Torneo" nueva):
+  - Tabla del torneo: pos, aciertos/n, tasa con barrita (escala 20-100%),
+    log loss con la barrita de la escala uniforme (0.95-1.20), Brier, O2.5.
+  - "¿Quién manda en cada liga?": campeón con la marca de color de su voz
+    (patrón reutilizado de /precision).
+  - "Forma viva": por voz, chips ✓/✗ + fila enlazada al detalle del partido
+    (fecha, marcador real, elegido, ll del pronóstico).
+  - Clases nuevas mínimas en globals.css (f-acierto/f-falla reusando
+    .forma-c, etc.).
+
+**Verificaciones (sobre datos reales de Neon):**
+- CLI del torneo: números EXACTOS a los históricos — poisson_doble 146/323
+  (45.2% · ll 1.0635 · Brier 0.6392) · poisson_dc 144/323 (44.6% · 1.0594) ·
+  lightgbm_v1 118/291 (40.5% · 1.0791); PD 42/87 = 48.3% del Fase 7 intacto.
+- Humo local: uvicorn :8001 contra Neon → GET /torneo 200 con contrato
+  completo y forma con partidos reales del 2026-10-21 (jornada CL); proceso
+  después matado (higiene).
+- Producción tras `4757c29` (CI VERDE ×2): Render auto-despliega →
+  `GET api.../torneo` 200 payload íntegro, `/health` sin cambiar
+  (1.590/3.756/937); Vercel → página `/torneo` 200 con título, voces y forma.
+
+**Lecciones de sesión:**
+- La separación pizarra/archivo es la decisión estructural acertada en la
+  Fase 3: sin ella, esta fase exigiría una tabla de promesas congeladas. El
+  docstring de models.pyvenía anunciando "(Fases 8, 13)" — la fase solo
+  CUMPLE lo prometido al consumir el ledger.
+- Agregados en SQL (COUNT FILTER, rutas JSONB) y ensamblado del ranking en
+  python puro: las reglas de negocio (desempates del podio, O2.5 opcional)
+  viven en funciones sin BD → pytest las cubre entera.
+- El JSONB de `reales_vs_previsto` ya guardaba favorito/resultado/log loss
+  por fila: el ranking NO recalcula nada — todo trazable al registro del
+  cron (auditable por diseño).
+
+**Estado tras Fase 13:** los tres productos centrales del plano viven —
+datos que se cargan solos (cron), 3 modelos compitiendo y la medición de
+aciertos como RANKING VIVO consumible (API + web), con la forma de cada
+voz como la de un equipo en la tabla. Pendiente el bloque de higiene del
+dueño (password Neon, NEOM_API_KEY, modernización de actions) y la Fase 14.
+
+**Siguientes pasos:**
+1. Vigilar el próximo cron (00:17 UTC): al confirmarse los partidos del
+   23-10 (jornada 11 de PD, SA…), la forma viva y la tabla del torneo
+   crecen solas — primera medición del ranking EN MARCHA.
+2. Fase 14 — CIERRE Y PORTAFOLIO (opcional/elevar): README final (badges,
+   diagrama de arquitectura, dashboard vivo), e2e opcional/Dependabot/deps
+   al día; las ideas futuras quedan anotadas ahí (valor esperado vs cuotas,
+   más ligas, LSTM).
+
+
 
 
 
