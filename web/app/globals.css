@@ -511,12 +511,13 @@ body {
   font-size: 0.9rem;
 }
 
-/* ══ NOCHE — rediseño editorial de la home ("Próximos partidos") ══════
+/* ══ NOCHE — home v2 "partido-protagonista" (Fase 14) ═════════════════
    Ámbito EXCLUSIVO de la home: el resto del sitio sigue en papel claro.
    La paleta: la pizarra del vestuario a página completa + tiza fría.
-   La ÚNICA audacia de color es el oro del sello unánime: si las tres
-   voces firman el mismo resultado, "una sola verdad" brilla. Todo lo
-   demás (división, pendiente, navegación) vive en tiza.          */
+   El PARTIDO es el héroe: frase de escenario y consenso 1/X/2 como
+   primer vistazo; las tres voces pliegan en <details>. El ÚNICO acento
+   de color es el ORO de la cifra del escenario; desde esta fase, la
+   unanimidad del sello vive en tiza, no compite por protagonismo.   */
 :root {
   --noche: #0c1613;
   --noche-tarjeta: #12201b;
@@ -644,7 +645,6 @@ body:has(main .noche) {
   background: var(--noche-tarjeta);
   border: 1px solid var(--noche-linea);
   border-radius: 6px;
-  padding: 0.85rem 1rem 0.95rem;
   text-decoration: none;
   color: inherit;
   min-width: 0;
@@ -655,6 +655,13 @@ body:has(main .noche) {
 .n-boletin:hover {
   border-color: rgba(233, 238, 228, 0.42);
   background: #152420;
+}
+/* el cuerpo clicable (todo menos el <details>) lleva el padding */
+.n-boletin-cuerpo {
+  display: block;
+  padding: 0.85rem 1rem 0.8rem;
+  text-decoration: none;
+  color: inherit;
 }
 
 .n-boletin-meta {
@@ -673,13 +680,127 @@ body:has(main .noche) {
   display: grid;
   gap: 0.08rem;
   font-weight: 800;
-  font-size: 1.14rem;
-  line-height: 1.2;
+  font-size: 1.24rem;
+  line-height: 1.16;
   letter-spacing: 0.01em;
-  margin: 0 0 0.85rem;
+  margin: 0 0 0.65rem;
 }
 
-/* ── las tres voces: barras 1|X|2 comparables ──────────────────────── */
+/* ── la frase de escenario: el héroe del boletín ───────────────────── */
+.n-rec {
+  color: var(--noche-texto);
+  font-size: 0.96rem;
+  line-height: 1.45;
+  margin: 0;
+}
+/* el ÚNICO acento de color de la noche: la cifra del escenario */
+.n-rec-clave {
+  color: var(--oro);
+  font-weight: 700;
+  padding-left: 0.4rem;
+  white-space: nowrap;
+}
+.n-rec-pendiente {
+  color: var(--noche-texto-2);
+  font-style: italic;
+}
+
+/* ── UNA barra de consenso (promedio de las voces) ─────────────────── */
+.n-consenso {
+  display: grid;
+  grid-template-columns: 5.2rem 1fr;
+  gap: 0.6rem;
+  align-items: center;
+  margin-top: 0.7rem;
+}
+.n-consenso-label {
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--noche-texto-2);
+}
+.n-consenso .n-barra {
+  height: 0.6rem;
+}
+
+/* ── chips mini: λ goles · marcador probable ───────────────────────── */
+.n-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin: 0.7rem 0 0;
+  padding: 0;
+}
+.n-chip-mini {
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.72rem;
+  color: var(--noche-texto-2);
+  border: 1px solid var(--noche-linea);
+  border-radius: 4px;
+  padding: 0.14rem 0.45rem;
+}
+
+/* ── las tres voces, plegadas: <details> con divergencia ───────────── */
+.n-voces-detalle {
+  padding: 0.35rem 1rem 0.9rem;
+}
+.n-voces-detalle > summary {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  border-top: 1px solid var(--noche-linea);
+  padding-top: 0.6rem;
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--noche-texto-2);
+}
+.n-voces-detalle > summary::-webkit-details-marker {
+  display: none;
+}
+.n-voces-detalle > summary::after {
+  content: "";
+  margin-left: auto;
+  width: 0.4rem;
+  height: 0.4rem;
+  border-right: 1.5px solid var(--noche-texto-2);
+  border-bottom: 1.5px solid var(--noche-texto-2);
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+.n-voces-detalle[open] > summary::after {
+  transform: rotate(-135deg);
+  margin-top: 0.2rem;
+}
+.n-voces-rotulo {
+  min-width: 0;
+}
+.n-voces-unanime {
+  font-weight: 700;
+  color: var(--noche-texto);
+  border: 1px solid rgba(233, 238, 228, 0.5);
+  border-radius: 4px;
+  padding: 0.05rem 0.35rem;
+  text-transform: none;
+}
+/* puntito de divergencia: siempre en tiza, el oro no es suyo */
+.n-voces-divergencia {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--t-b1);
+  opacity: 0.85;
+  flex: none;
+}
+.n-voces-detalle .n-voces {
+  margin: 0.7rem 0 0.75rem;
+}
+
+/* ── filas-voz y barras 1|X|2 (compartidas con el consenso) ────────── */
 .n-voces {
   display: grid;
   gap: 0.5rem;
@@ -764,15 +885,11 @@ body:has(main .noche) {
 .n-firma-vacia {
   opacity: 0.5;
 }
-/* LA audacia de color: unanimidad de las voces = oro */
+/* La unanimidad ya no toma el oro: desde la Fase 14 el oro es de la
+   recomendación. Aquí queda expresada en tiza (borde más firme); el
+   rótulo "unánime" del <details> lo dice con texto. */
 .n-sello-unanime .n-firma {
-  background: rgba(240, 180, 41, 0.1);
-  border-color: var(--oro);
-  color: var(--oro);
-}
-.n-sello-unanime .n-firma b,
-.n-sello-unanime .n-firma-pct {
-  color: var(--oro);
+  border-color: rgba(233, 238, 228, 0.5);
 }
 .n-sello-vacio {
   color: var(--noche-texto-2);
@@ -869,18 +986,34 @@ body:has(main .noche) {
   height: 1.05rem;
   margin-bottom: 0.3rem;
 }
-.n-skel-barra {
-  height: 0.55rem;
-  margin-top: 0.8rem;
+/* frase de escenario */
+.n-skel-rec {
+  height: 1.05rem;
+  max-width: 94%;
+  margin-top: 0.75rem;
 }
-.n-firmas-skel {
+/* consenso: etiqueta + barra dentro del grid real */
+.n-skel-cons-label {
+  height: 0.6rem;
+}
+.n-skel-cons {
+  height: 0.6rem;
+}
+/* chips mini de λ/marcador */
+.n-chips-mini-skel {
   display: flex;
-  gap: 0.4rem;
-  margin-top: 1.05rem;
+  gap: 0.35rem;
+  margin-top: 0.7rem;
 }
-.n-skel-firma {
-  height: 1.6rem;
-  flex: 0 0 4.6rem;
+.n-skel-chip-mini {
+  height: 1.05rem;
+  width: 4.9rem;
+}
+/* línea del <details> plegado */
+.n-skel-detalle {
+  height: 0.75rem;
+  width: 9rem;
+  margin-top: 0.15rem;
 }
 
 /* foco visible de teclado en toda la web */

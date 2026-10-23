@@ -2,11 +2,13 @@ import Link from "next/link";
 import { Suspense } from "react";
 import SkeletonPartidos from "@/components/SkeletonPartidos";
 import { SelLiga } from "@/components/Selectores";
+import { obtenerFixtures, type Fixture } from "@/lib/api";
 import {
-  obtenerFixtures,
-  type Fixture,
-  type PrediccionResumen,
-} from "@/lib/api";
+  escenario,
+  letraDe,
+  pctDe,
+  type Escenario,
+} from "@/lib/escenario";
 import {
   MODELOS,
   esLigaValida,
@@ -14,12 +16,11 @@ import {
   horaUtc,
   nombreLiga,
   nombreModelo,
+  num,
   pct,
 } from "@/lib/formato";
 
 export const metadata = { title: "Próximos partidos" };
-
-type Letra = "1" | "X" | "2";
 
 const SIGLAS: Record<string, string> = {
   poisson_doble: "pd",
@@ -94,16 +95,16 @@ function Hero({ liga }: { liga: string }) {
       <p className="n-kicker num">{nombreLiga(liga)}</p>
       <h1 className="n-cartel">Próximos partidos</h1>
       <p className="n-hero-sub">
-        {nombreModelo("poisson_doble")}, {nombreModelo("poisson_dc")} y{" "}
-        {nombreModelo("lightgbm_v1")} firman su pronóstico sobre cada partido.
-        Cuando las tres firmas apuntan al mismo resultado, el sello se enciende
-        en oro: una sola voz. Fechas y horas en UTC.
+        El partido manda: cada boletín abre con su escenario — una frase y una
+        cifra — y una barra de consenso 1/X/2. Las tres voces firmantes quedan
+        plegadas en «Las tres voces», a un clic de quien quiera el detalle.
+        Fechas y horas en UTC.
       </p>
     </header>
   );
 }
 
-/** Clave de lectura: qué significa cada segmento y qué conquista el oro. */
+/** Clave de lectura: qué es la barra única y dónde viven las voces. */
 function Leyenda() {
   return (
     <p className="n-leyenda">
@@ -112,76 +113,126 @@ function Leyenda() {
         <b className="n-seg-x" />
         <b className="n-seg-2" />
       </span>
-      Barras por voz: 1 local, X empate, 2 visita. El sello firma la apuesta de
-      cada voz con su probabilidad; oro cuando es unánime.
+      La barra es el consenso (promedio de las voces): 1 local, X empate, 2
+      visita. Dentro de «Las tres voces» están las barras y firmas de cada
+      modelo; el oro se reserva a la cifra del escenario.
     </p>
   );
 }
 
-/** Un boletín = un partido con las tres voces compitiendo sobre él. */
+/** Un boletín = un partido: escenario héroe, consenso y voces plegadas. */
 function Boletin({ fixture }: { fixture: Fixture }) {
-  const porModelo = new Map(fixture.predicciones.map((p) => [p.modelo, p]));
+  const esc = escenario(fixture);
 
+  const porModelo = new Map(fixture.predicciones.map((p) => [p.modelo, p]));
   const voces = MODELOS.map((m) => {
     const pr = porModelo.get(m.id);
     return { m, pr, letra: letraDe(pr) };
   });
-
   const firmas = voces.filter((v) => v.letra !== null);
-  const letras = new Set(firmas.map((v) => v.letra));
-  const unanime = firmas.length >= 2 && letras.size === 1;
-  const dividido = firmas.length >= 2 && letras.size > 1;
+  const unanime = firmas.length >= 2 && new Set(firmas.map((v) => v.letra)).size === 1;
 
   const selloAria =
     firmas.length === 0
       ? "Sello sin firmas: pronóstico pendiente"
       : `Sello de firmas: ${firmas
           .map((v) => `${nombreModelo(v.m.id)} firma ${v.letra}`)
-          .join(", ")}${unanime ? " (unánime)" : dividido ? " (dividido)" : ""}`;
+          .join(", ")}${unanime ? " (unánime)" : esc.dividido ? " (dividido)" : ""}`;
 
   return (
-    <Link className="n-boletin" href={`/partido/${fixture.partido_id_api}`}>
-      <p className="n-boletin-meta num">
-        <span>{fechaDia(fixture.fecha_utc)}</span>
-        <span>{horaUtc(fixture.fecha_utc)}</span>
-        {fixture.jornada && <span>J{fixture.jornada}</span>}
-      </p>
-      <h2 className="n-boletin-matchup">
-        {fixture.local}
-        <span>{fixture.visitante}</span>
-      </h2>
-      <div className="n-voces">
-        {voces.map(({ m, pr }) => (
-          <VozFila key={m.id} modeloId={m.id} nombre={m.nombre} nota={m.nota} pr={pr} />
-        ))}
-      </div>
-      <p
-        className={`n-sello${unanime ? " n-sello-unanime" : ""}${
-          dividido ? " n-sello-dividido" : ""
-        }`}
-        role="group"
-        aria-label={selloAria}
+    <article className="n-boletin">
+      <Link
+        className="n-boletin-cuerpo"
+        href={`/partido/${fixture.partido_id_api}`}
       >
-        {firmas.length === 0 ? (
-          <span className="n-sello-vacio">pronóstico pendiente</span>
-        ) : (
-          voces.map(({ m, pr, letra }) => (
+        <p className="n-boletin-meta num">
+          <span>{fechaDia(fixture.fecha_utc)}</span>
+          <span>{horaUtc(fixture.fecha_utc)}</span>
+          {fixture.jornada && <span>J{fixture.jornada}</span>}
+        </p>
+        <h2 className="n-boletin-matchup">
+          {fixture.local}
+          <span>{fixture.visitante}</span>
+        </h2>
+        <p className={`n-rec${esc.tono === "pendiente" ? " n-rec-pendiente" : ""}`}>
+          {esc.frase}
+          {esc.clave && <b className="num n-rec-clave">{esc.clave}</b>}
+        </p>
+        <Consenso consenso={esc.consenso} />
+        <Chips esc={esc} />
+      </Link>
+
+      <details className="n-voces-detalle">
+        <summary>
+          <span className="n-voces-rotulo">Las tres voces</span>
+          {unanime && <b className="num n-voces-unanime">unánime</b>}
+          {esc.dividido && (
             <span
-              key={m.id}
-              className={`n-firma voz-${m.id}${letra === null ? " n-firma-vacia" : ""}`}
-              title={m.nota}
-            >
-              <span className="punto-voz" aria-hidden="true" />
-              <span className="n-firma-sigla">{SIGLAS[m.id] ?? m.id}</span>
-              <b className="num">{letra ?? "—"}</b>
-              {letra !== null && pr ? (
-                <span className="num n-firma-pct">{pct(pctDe(pr, letra))}</span>
-              ) : null}
-            </span>
-          ))
-        )}
-      </p>
-    </Link>
+              className="n-voces-divergencia"
+              title="Las voces no coinciden en el resultado"
+              aria-label="Con divergencia: las voces no coinciden en el resultado"
+            />
+          )}
+        </summary>
+        <div className="n-voces">
+          {voces.map(({ m, pr }) => (
+            <VozFila key={m.id} modeloId={m.id} nombre={m.nombre} nota={m.nota} pr={pr} />
+          ))}
+        </div>
+        <p className="n-sello" role="group" aria-label={selloAria}>
+          {firmas.length === 0 ? (
+            <span className="n-sello-vacio">sin firmas todavía</span>
+          ) : (
+            voces.map(({ m, pr, letra }) => (
+              <span
+                key={m.id}
+                className={`n-firma voz-${m.id}${letra === null ? " n-firma-vacia" : ""}`}
+                title={m.nota}
+              >
+                <span className="punto-voz" aria-hidden="true" />
+                <span className="n-firma-sigla">{SIGLAS[m.id] ?? m.id}</span>
+                <b className="num">{letra ?? "—"}</b>
+                {letra !== null && pr ? (
+                  <span className="num n-firma-pct">{pct(pctDe(pr, letra))}</span>
+                ) : null}
+              </span>
+            ))
+          )}
+        </p>
+      </details>
+    </article>
+  );
+}
+
+/** El número del escenario en el chasis de la tarjeta. */
+function Chips({ esc }: { esc: Escenario }) {
+  if (esc.lambdaGoles === null && !esc.marcador) return null;
+  return (
+    <p className="n-chips num">
+      {esc.lambdaGoles !== null && (
+        <span className="n-chip-mini">λ {num(esc.lambdaGoles, 1)} goles</span>
+      )}
+      {esc.marcador && <span className="n-chip-mini">marcador {esc.marcador}</span>}
+    </p>
+  );
+}
+
+/** UNA barra de consenso: promedio simple de las voces que emiten. */
+function Consenso({ consenso }: { consenso: Escenario["consenso"] }) {
+  if (!consenso) return null;
+  return (
+    <div className="n-consenso">
+      <span className="n-consenso-label num">consenso</span>
+      <span
+        className="n-barra"
+        role="img"
+        aria-label={`Consenso de las voces: local ${pct(consenso.p1, 0)}, empate ${pct(consenso.px, 0)}, visita ${pct(consenso.p2, 0)}`}
+      >
+        <b className="n-seg-1" style={{ width: `${100 * consenso.p1}%` }} />
+        <b className="n-seg-x" style={{ width: `${100 * consenso.px}%` }} />
+        <b className="n-seg-2" style={{ width: `${100 * consenso.p2}%` }} />
+      </span>
+    </div>
   );
 }
 
@@ -195,7 +246,7 @@ function VozFila({
   modeloId: string;
   nombre: string;
   nota: string;
-  pr: PrediccionResumen | undefined;
+  pr: Fixture["predicciones"][number] | undefined;
 }) {
   const pl = pr?.prob_local ?? null;
   const px = pr?.prob_empate ?? null;
@@ -228,25 +279,4 @@ function VozFila({
       )}
     </div>
   );
-}
-
-/** La letra que firma una voz (null = aún no puede prometer nada). */
-function letraDe(pr: PrediccionResumen | undefined): Letra | null {
-  if (!pr) return null;
-  if (pr.prob_local === null || pr.prob_empate === null || pr.prob_visita === null) {
-    return null;
-  }
-  const triple: Array<[number, Letra]> = [
-    [pr.prob_local, "1"],
-    [pr.prob_empate, "X"],
-    [pr.prob_visita, "2"],
-  ];
-  return triple.reduce((a, b) => (b[0] > a[0] ? b : a))[1];
-}
-
-/** La probabilidad que respalda la letra firmada. */
-function pctDe(pr: PrediccionResumen, letra: Letra): number | null {
-  if (letra === "1") return pr.prob_local;
-  if (letra === "X") return pr.prob_empate;
-  return pr.prob_visita;
 }
