@@ -42,6 +42,7 @@ from .models import (
     Prediccion,
     RealesVsPrevisto,
 )
+from .torneo import FORMA_POR_DEFECTO, construir_torneo, leer_ledger
 
 LIGAS_VALIDAS = ("PD", "PL", "SA", "BL1", "CL")
 ESTADOS_POR_JUGAR = ("SCHEDULED", "TIMED")
@@ -171,6 +172,53 @@ class MetricasModelo(BaseModel):
     accuracy: float | None
     log_loss: float | None
     brier: float | None
+
+
+class TorneoLiga(BaseModel):
+    """Recorte por liga de un modelo en el torneo vivo (Fase 13)."""
+
+    liga: str
+    evaluados: int
+    aciertos: int
+    accuracy: float | None
+
+
+class TorneoO25(BaseModel):
+    """Over/under 2.5 del modelo: solo voces que emiten esa probabilidad."""
+
+    evaluados: int
+    aciertos: int
+    accuracy: float | None
+
+
+class TorneoForma(BaseModel):
+    """Último partido confirmado de una voz (la "forma" del modelo)."""
+
+    partido_id_api: int
+    liga: str
+    fecha_utc: str
+    local: str
+    visitante: str
+    goles_local: int
+    goles_visitante: int
+    elegido: str
+    resultado: str
+    acierto_1x2: bool
+    log_loss_prediccion: float | None
+
+
+class TorneoModelo(BaseModel):
+    """El torneo visto como tabla de posiciones (Fase 13)."""
+
+    modelo: str
+    evaluados: int
+    aciertos: int
+    accuracy: float | None
+    log_loss: float | None
+    brier: float | None
+    o25: TorneoO25 | None
+    por_liga: list[TorneoLiga]
+    forma: list[TorneoForma]
 
 
 # ───────────────────────────────── endpoints ────────────────────────────────
@@ -493,6 +541,23 @@ def model_accuracy(
         )
         for modelo, liga_fila, evaluados, accuracy, log_loss, brier in session.execute(stmt).all()
     ]
+
+
+@app.get("/torneo", response_model=list[TorneoModelo], tags=["modelo"])
+def torneo(
+    session: Sesion,
+    forma: Annotated[int, Query(ge=1, le=25, description="Partidos recientes por voz")] = FORMA_POR_DEFECTO,
+) -> list[TorneoModelo]:
+    """Ranking vivo de los 3 modelos, como una tabla de posiciones (Fase 13).
+
+    Lee el ledger `reales_vs_previsto` que el cron de la Fase 12 refresca con
+    la evaluación walk-forward y lo arma por modelo: tasa de acierto 1X2,
+    log loss/Brier medios, over/under 2.5 (solo las voces que emiten esa
+    probabilidad), el recorte por liga y la forma de los últimos
+    confirmados. Orden: mejor accuracy 1X2 primero; empate → más evaluados.
+    """
+    aggs, formas_de = leer_ledger(session, forma)
+    return [TorneoModelo(**t) for t in construir_torneo(aggs, formas_de)]
 
 
 if __name__ == "__main__":

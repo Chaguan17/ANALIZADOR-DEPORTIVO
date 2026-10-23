@@ -2,6 +2,7 @@ import Link from "next/link";
 
 const ENLACES: Array<{ href: string; texto: string }> = [
   { href: "/", texto: "Partidos" },
+  { href: "/torneo", texto: "Torneo" },
   { href: "/ranking/PD", texto: "Rankings" },
   { href: "/precision", texto: "Precisión" },
 ];

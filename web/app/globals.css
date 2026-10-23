@@ -435,6 +435,41 @@ body {
   border-radius: 3px;
   color: var(--blanco);
 }
+/* torneo de los modelos (Fase 13): chips de ✓/✗ de la forma viva */
+.f-acierto {
+  background: #1b6b3a;
+}
+.f-falla {
+  background: var(--c-2);
+}
+.torneo-pos {
+  font-family: var(--font-num), Consolas, monospace;
+  color: var(--tinta-2);
+}
+.torneo-bloque-formas {
+  display: grid;
+  gap: 1.4rem;
+}
+.torneo-forma h3 {
+  font-size: 1.05rem;
+  margin-bottom: 0.5rem;
+}
+.torneo-forma-lista {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.75;
+  max-width: 46rem;
+}
+.torneo-fecha {
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.76rem;
+}
+.torneo-forma-lista a {
+  color: inherit;
+  text-decoration-color: var(--tinta-2);
+}
 .f-gana {
   background: #1b6b3a;
 }

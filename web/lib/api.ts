@@ -104,6 +104,45 @@ export interface MetricasModelo {
   brier: number | null;
 }
 
+export interface TorneoLiga {
+  liga: string;
+  evaluados: number;
+  aciertos: number;
+  accuracy: number | null;
+}
+
+export interface TorneoO25 {
+  evaluados: number;
+  aciertos: number;
+  accuracy: number | null;
+}
+
+export interface TorneoForma {
+  partido_id_api: number;
+  liga: string;
+  fecha_utc: string;
+  local: string;
+  visitante: string;
+  goles_local: number;
+  goles_visitante: number;
+  elegido: string;
+  resultado: string;
+  acierto_1x2: boolean;
+  log_loss_prediccion: number | null;
+}
+
+export interface TorneoModelo {
+  modelo: string;
+  evaluados: number;
+  aciertos: number;
+  accuracy: number | null;
+  log_loss: number | null;
+  brier: number | null;
+  o25: TorneoO25 | null;
+  por_liga: TorneoLiga[];
+  forma: TorneoForma[];
+}
+
 /** Lee un número del JSONB de diagnóstico (o null si no viaja). */
 export function numDe(o: DatosExtra | null, clave: string): number | null {
   if (!o) return null;
@@ -142,3 +181,5 @@ export const obtenerRankings = (liga: string) =>
   jsonDe<ClasificacionFila[]>(`/rankings?liga=${liga}`);
 
 export const obtenerPrecision = () => jsonDe<MetricasModelo[]>("/model-accuracy");
+
+export const obtenerTorneo = () => jsonDe<TorneoModelo[]>("/torneo");
