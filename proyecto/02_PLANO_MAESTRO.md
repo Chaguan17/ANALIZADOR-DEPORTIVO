@@ -2,7 +2,7 @@
 
 > **Documento vivo de seguimiento.** Marca `- [x]` cada fase/hito completado y añade la fecha.
 > Referencia completa del diseño: `proyecto/00_CONTEXTO.md` · bitácora: `proyecto/01_MEMORIA.md`
-> Última actualización: 2026-10-23 (Sesión 16 — renumeración: antigua Fase 14 → Fase 17)
+> Última actualización: 2026-10-23 (Sesión 17 — Fase 15 completa vía ESPN: Understat descartado por robots.txt y los cornes reingresan)
 
 ---
 
@@ -146,46 +146,72 @@
 - [x] Verificación: lint + next build verdes · CI · humo producción
       (2026-10-23)
 
-## FASE 15 — TARJETAS: INGESTA → TASAS → MODELO (backend + web)
-> Fuente: football-data.org `bookings` en el DETALLE de cada partido
-> (GET /v4/matches/{id}, 1 req por partido). Alineaciones del mismo request
-> → apariciones por jugador.
-- [ ] Ingesta del detalle: `bookings` (amarillas/rojas con jugador y
-      minuto) + alineaciones → `stats_partido`; backfill por lotes
-      (~40/corrida del cron, pausa >6 s por el límite 10 req/min)
-- [ ] `backend/app/tarjetas.py` (puro): tasas por equipo (local/visita)
-      con shrinkage hacia la media de liga + propensión por jugador
-      (casamiento por nombre+equipo, normalización; riesgo de duplicados
-      documentado)
-- [ ] Modelo: Poisson O/U tarjetas 2.5 y 3.5 + top jugadores a riesgo
-      («provisional» hasta completar el backfill); las rojas se registran,
-      no se modelan
-- [ ] Endpoints `GET /partido/{id}/tarjetas` y `GET /tarjetas?liga=` +
-      sección web + paso del cron con presupuesto de requests + pruebas
+## FASE 15 — TARJETAS: INGESTA COMÚN ESPN → TASAS → MODELO (backend + web) ✔ COMPLETA (2026-10-23)
+> REVISIÓN del dueño (Sesión 17): football-data.org NO entrega `bookings` ni
+> alineaciones en el detalle del free tier → la fuente de stats de partido es
+> **ESPN** (`site.api.espn.com`, la API que consume la app de ESPN; NO oficial,
+> sin clave y documentada como tal; cubre 5/5 ligas INCLUYENDO la Champions).
+> UNA sola ingesta alimenta tarjetas (esta fase) Y tiros/cornes (Fase 16) vía
+> el JSONB `stats_partido`.
+- [x] Matcher offline `pipeline/espn.py` (+ tests): transliteración de
+      letras que NFD no descompone (ø→o, æ→ae, ß→ss, đ/ł/ħ/ŧ),
+      contención de tokens bidireccional y pares manuales en
+      `pipeline/mapping_espn.json`; CLI `mapear` = auditoría dev-time
+      (exit 0 SOLO si todos los jugados de las 5 ligas quedan
+      emparejados: 337/337 ✓, con los ambiguos de PD verificados contra
+      los crudos: «Barcelona»=FC Barcelona, «Deportivo»=La Coruña)
+- [x] Ingesta incremental `backend/app/espn.py` (CLI
+      actualizar/cargar/estado): estado = BD (FINISHED sin ambas filas
+      ESPN) + crudos cache-first en disco; en Actions el crudo vive en
+      `actions/cache` con clave diaria + restore-keys (el disco del
+      runner es efímero: sin cache, cada corrida quemaría el
+      presupuesto re-bajando ~140 scoreboards); pacing 2.5 s,
+      reintentos 3×(3/6/12 s), 4xx definitivo → skip; presupuesto
+      total por corrida; NUNCA levanta el cron (exit 0 siempre)
+- [x] Parsers del summary: boxscore (totalShots/shotsOnTarget/
+      yellowCards/redCards/wonCorners por equipo), keyEvents (tarjetas
+      por jugador con minuto), rosters (apariciones) y leaders (tiros
+      por jugador) → upsert JSONB con merge en datos
+- [x] Núcleo compartido `backend/app/rates.py`: tasa encogida (k=6),
+      Poisson renormalizada, prob over/under y evaluación walk-forward
+      HONESTA (omite el arranque sin historia; exactitud ≈ base rate,
+      el MAE de λ es la métrica real); lector JSONB
+      `backend/app/stats_filas.py` (filas hidratadas por liga)
+- [x] Modelo `backend/app/tarjetas.py`: Poisson O/U líneas fijas
+      2.5/3.5; las ROJAS se registran, NO se modelan; propensión por
+      jugador por APARICIÓN (tasa · apariciones); CLI de inspección
+      `--liga`
+- [x] Endpoints `GET /tarjetas?liga=` y `GET /partido/{id}/tarjetas`
+      (reales por jugador con minuto, predicción walk-forward, propensos
+      por lado, calidad O/U 2.5/3.5, notas honestas de fuente no oficial)
+      + sección web Tarjetas en /partido + pruebas (13 ESPN + 10
+      tarjetas, fixtures sintéticas de tipo ESPN)
+- [x] Fix CI (hotfix `240c4dd`): `pipeline/config.py` ya NO exige el
+      FOOTBALL_API_KEY al importar — `exigir_token()` vive en la
+      construcción del `FootballDataClient` (el matcher ESPN es offline
+      y los tests de CI corren sin secretos, como el resto del repo)
 
-## FASE 16 — TIROS CON UNDERSTAT (fuente gratuita secundaria)
-> Fuente: `understatapi` (scraping de understat.com, sin clave): ligas
-> PL/PD/SA/BL1 (+L1/RFPL), temporada vigente, tiros por partido con
-> jugador/minuto/xG/resultado. SIN Champions League → «—» honesto.
-> «A puerta» = gol + parado (derivado del resultado del tiro).
-- [ ] Adapter `pipeline/tiros.py`: diccionario auditable de nombres de
-      equipos Understat ↔ football-data (~100 equipos, 4 ligas del MVP)
-- [ ] Ingesta por partido (1 request): tiros totales / a puerta / xG y
-      desglose por jugador → `stats_partido`; backfill ~330 partidos en
-      lotes ~40/corrida + incremental; los tiros REALES de los jugados
-      también bajan → sus predicciones se evalúan walk-forward y entran
-      al torneo vivo
-- [ ] `backend/app/tiros.py` (puro): tasas por equipo (local/visita,
-      total y a puerta, shrinkage) + ranking de tiradores (SoT/aparición)
-- [ ] Endpoints `GET /partido/{id}/tiros` y `GET /tiros?liga=` + sección
-      web + paso del cron + pruebas + pin de `understatapi` en
-      requirements
-- [x] **Cornes: FUERA DE ALCANCE** (decisión del dueño, 2026-10-23) —
-      ninguna fuente gratuita entrega cornes de la temporada vigente
-      (Understat no los tiene; StatsBomb Open Data solo histórico;
-      Opta Analyst es editorial sin API) → una predicción de cornes no
-      sería verificable en vivo y contradice el walk-forward; nota
-      honesta en la web y tablas ya preparadas
+## FASE 16 — TIROS + CORNES (modelo + web sobre la ingesta común ESPN)
+> REVISIÓN del dueño (Sesión 17): Understat DESCARTADO (su robots.txt es
+> `Disallow: /` — el scraping está prohibido; fallo de la auditoría de la
+> Sesión 16: se verificó precio/API de las fuentes secundarias pero NO el
+> robots.txt de las primarias) y los CORNES REINGRESAN (decisión contraria
+> a la de entonces): ESPN entrega ambos en el MISMO summary ya ingestado en
+> la Fase 15 (`stats_partido.tiros` y `stats_partido.cornes`). El trabajo
+> de esta fase es SOLO modelo + web — SIN ingesta nueva, SIN tablas nuevas
+> y SIN cron extra.
+> Líneas fijas: tiros 23.5 / a puerta 8.5 · cornes 9.5 / 11.5.
+- [ ] `backend/app/tiros.py`: tasas por equipo (total y a puerta,
+      shrinkage k=6) + ranking de tiradores (leaders `totalShots` ÷
+      aparición, mín. 2) + walk-forward O/U con el MAE de λ como métrica
+      real de afinación
+- [ ] `backend/app/cornes.py`: tasas por equipo (wonCorners por
+      aparición) + walk-forward O/U 9.5 y 11.5 (sin ranking de
+      jugadores: lo verificable es el TOTAL del equipo)
+- [ ] Endpoints `GET /tiros?liga=`, `GET /partido/{id}/tiros`,
+      `GET /cornes?liga=`, `GET /partido/{id}/cornes` + secciones web +
+      pruebas + commit separado por fase con su ritual (CI verde → humo
+      producción → bitácora)
 
 ## FASE 17 — CIERRE Y PORTAFOLIO (antigua Fase 14, renumerada 2026-10-23)
 - [ ] README final: badges, diagrama de arquitectura, link al dashboard vivo

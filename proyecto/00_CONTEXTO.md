@@ -2,7 +2,7 @@
 
 > **Documento vivo.** Toda decisión de diseño se registra aquí con fecha. Si un conocimiento
 > no está en este archivo (ni en `01_MEMORIA.md`), el proyecto lo ha olvidado.
-> Última actualización: 2026-10-22
+> Última actualización: 2026-10-23
 
 ---
 
@@ -59,6 +59,8 @@ y despliegue 100% gratuito. Doble propósito:
 | 2026-10-23 | **Fase 14 — home v2 «partido-protagonista»**: el héroe del boletín es el PARTIDO — matchup grande + frase de escenario con su cifra en oro + UNA barra de consenso (promedio simple de las voces) + chips mini (λ · marcador); las tres voces pliegan en `<details>` con puntito de divergencia y rótulo «unánime»; el ORO deja el sello (que queda en tiza firme) y pasa a la cifra del escenario, ÚNICO acento de color | Crítica del dueño: los modelos robaban protagonismo y el diseño no era intuitivo. El motor (`web/lib/escenario.ts`, función PURA con reglas por prioridad goles/cerrado/favorito/dividido/equilibrado) vive en la web porque TODO su insumo ya baja en `/fixtures` — cero backend nuevo; el `<details>` es hermano del `<Link>` para que el toggle no navegue |
 | 2026-10-23 | **Fases nuevas** (fijadas con el dueño): **15 — Tarjetas** con modelo completo (bookings del detalle de partidos → tasas → Poisson O/U + top jugadores a riesgo); **16 — Tiros** vía Understat (`understatapi`, gratuito y sin clave) con tiros reales de partidos jugados → evaluación walk-forward que entra al torneo; **CORNES fuera de alcance** — ninguna fuente gratuita entrega cornes de la temporada vigente (Understat no los tiene, StatsBomb Open Data es solo histórico, Opta Analyst es editorial sin API) y una predicción no verificable en vivo contradice el alma walk-forward; la antigua «Fase 14 — Cierre» pasa a **Fase 17** | La frase del dueño fue «los modelos se llevan todo el protagonismo» + «agregar nuevos parámetros». API-Football descartada (paga); la auditoría de fuentes gratuitas se verificó contra fuentes primarias (PyPI de understatapi, competitions.json de StatsBomb) antes de decidir |
 
+| 2026-10-23 | **Fase 15 completa + fuente de stats de partido = ESPN (REVERSIÓN de la Sesión 16)**: la verificación contra la API real mostró que football-data.org NO entrega `bookings` ni alineaciones en el detalle del free tier → la ingesta de stats (tarjetas, tiros, cornes) pasa a un módulo nuevo `backend/app/espn.py` contra `site.api.espn.com` (la API que consume la app de ESPN: NO oficial, sin clave y documentada como tal; ~32 stats por equipo/partido + tarjetas por jugador con minuto + alineaciones + líderes de tiros; cubre 5/5 ligas INCLUYENDO Champions; pacing 2.5 s, reintentos 3×(3/6/12 s), 4xx → skip). Consecuencias en cadena: **Understat descartado** (su robots.txt es `Disallow: /` — el scraping está prohibido; la auditoría de la Sesión 16 había verificado precio y API pero NO el robots.txt), **cornes REINGRESAN** (decisión contraria a la de entonces: ESPN entrega `wonCorners` por equipo; líneas fijas 9.5/11.5) y la Fase 16 deja de necesitar ingesta: tiros/cornes suben al MISMO JSONB `stats_partido` que las tarjetas — su trabajo será solo modelo + web. Piezas: matcher offline `pipeline/espn.py` (transliteración de las letras que NFD no descompone: ø→o, æ→ae, ß→ss, đ/ł/ħ/ŧ + contención de tokens bidireccional + pares manuales en `pipeline/mapping_espn.json`; CLI `mapear` audita 337/337 con exit 0), ingesta incremental con estado en BD y crudos cache-first (en Actions el crudo vive en `actions/cache` de clave diaria — el disco del runner es efímero), núcleo compartido `rates.py` (tasa encogida k=6 + Poisson renormalizada + walk-forward honesto) y lector `stats_filas.py`, modelo `tarjetas.py` (Poisson O/U 2.5/3.5; rojas registradas, NO modeladas), endpoints `/tarjetas` y `/partido/{id}/tarjetas` + sección web | Moraleja de auditoría de fuentes: verificar SIEMPRE el robots.txt antes de elegir un scraper, no solo el precio. ESPN es fuente NO oficial → las notas de la API lo declaran y la auditoría del cron IMPRIME la cobertura de `stats_partido` sin exigirla (no forma parte de las 3 tablas de football-data que sí se assertean). El fail-fast del FOOTBALL_API_KEY se movió de la importación a la construcción del cliente (`exigir_token()`): los módulos offline y los tests de CI no deben necesitar credencial para importar |
+
 ## 4. STACK TÉCNICO
 
 - **Frontend:** Next.js (App Router) + TypeScript + Tailwind + Recharts
@@ -110,9 +112,16 @@ ANALIZADOR DEPORTIVO/
   → se agregará después vía API-Football
 - Free tier disponible además para: Brasileirão `BSA`, Championship `ELC`, Eurocopa `EC`, Ligue 1 `FL1`,
   Eredivisie `DED`, Primeira Liga `PPL`, Libertadores `CLI`, Mundial `WC`
+- **Stats de partido (Fases 15-16):** ESPN `site.api.espn.com` — la API que consume
+  la app de ESPN: NO oficial, sin clave y con honestidad documentada (fue la elección
+  del dueño tras descartar las demás): boxscore con ~32 stats por equipo
+  (tiros/a puerta/tarjetas/cornes → `stats_partido`), keyEvents de tarjetas por
+  jugador con minuto, alineaciones y líderes de tiros; cubre 5/5 ligas del MVP
+  CON Champions; pacing 2.5 s y crudos cache-first (en Actions: `actions/cache`)
 - **Limitación conocida del free tier:** goleadores solo con los **10 mejores por liga**
-  (listas completas: FBref/Understat en la Fase 6)
-- **Respaldo para jugadores (Fase 6):** FBref / Understat (CSV o scraping puntual)
+  (listas completas: FBref en la Fase 6)
+- **Respaldo para jugadores (Fase 6):** FBref (scraping puntual). **Understat
+  DESCARTADO (2026-10-23):** su robots.txt es `Disallow: /` — el scraping está prohibido
 - **Límites:** 10 peticiones/minuto en el tier gratuito → todos los datos se persisten en disco crudo
   y luego en Postgres; nunca se pide a la API lo que ya está guardado (caché-first).
 

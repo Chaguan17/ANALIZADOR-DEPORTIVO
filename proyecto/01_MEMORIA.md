@@ -1006,6 +1006,114 @@ producción: home 200 con la frase de escenario y la consenso única,
 3. Higiene del dueño (sin bloqueo): password Neon, borrar NEOM_API_KEY,
    actions modernizables.
 
+## Sesión 17 — 2026-10-23 — Fase 15 COMPLETA: tarjetas con ingesta común ESPN (giro de fuente)
+
+**Qué se hizo:**
+- Verificación contra la API real: football-data.org NO entrega `bookings`
+  ni alineaciones en el detalle del free tier → la Fase 15 tal como estaba
+  planificada era inviable con su fuente. Auditoría de alternativas:
+  Understat DESCARTADO en seco (su robots.txt es `Disallow: /` — el
+  scraping está prohibido; la auditoría de la S.16 verificó precio y API
+  pero nunca el robots.txt → moraleja fichada en CONTEXTO) y elección del
+  dueño: **ESPN** (`site.api.espn.com`, no oficial, sin clave, 5/5 ligas
+  CON Champions).
+- Con ESPN los cornes REINGRESAN (revirtiendo la decisión de la Sesión 16)
+  y la Fase 16 pierde la ingesta: tiros/cornes/tarjetas suben al MISMO
+  JSONB `stats_partido` en una sola cadena de ingesta.
+- `pipeline/espn.py` (matcher offline ESPN→football-data, compartido con
+  la ingesta vía import): transliteración de las letras que NFD no
+  descompone (ø→o, æ→ae, ß→ss, đ/ł/ħ/ŧ — «Bodø/Glimt»), contención de
+  tokens bidireccional y pares manuales en `pipeline/mapping_espn.json`
+  (PD: Barcelona→FC Barcelona y Deportivo→RC Deportivo La Coruña,
+  verificado contra los crudos que ESPN no usa «Deportivo» para Alavés;
+  BL1: Bayern Munich / FC Cologne / Hamburg SV; CL: AEK Athens, Slavia
+  Prague, Sporting CP). CLI `mapear`: **337/337 jugados emparejados,
+  exit 0**.
+- `backend/app/espn.py`: ingesta viva incremental — estado = BD
+  (FINISHED sin ambas filas ESPN) + crudos cache-first en disco; pacing
+  2.5 s, reintentos 3×(3/6/12 s), 4xx → skip definitivo, fila-marca para
+  summaries sin stats; NUNCA levanta (exit 0). Parsers: boxscore
+  (totalShots/shotsOnTarget/yellow/red/wonCorners), keyEvents (tarjetas
+  por jugador con minuto), rosters (apariciones) y leaders (tiros por
+  jugador) → upsert JSONB con merge por lado.
+- `backend/app/rates.py`: núcleo compartido de los modelos de stats
+  (tasa encogida k=6, Poisson renormalizada, evaluación walk-forward
+  honesta — omite el arranque sin historia; el MAE de λ es la métrica
+  de afinación) + `stats_filas.py` (lector JSONB completo).
+- `backend/app/tarjetas.py`: Poisson O/U líneas fijas 2.5/3.5 (rojas
+  solo reales), propensos por APARICIÓN, CLI `--liga`.
+- `api.py`: `GET /tarjetas?liga=` y `GET /partido/{id}/tarjetas` (reales
+  por jugador con minuto, predicción walk-forward, propensos por lado,
+  calidad O/U, notas honestas). Web: sección Tarjetas en la página de
+  partido con contratos en `web/lib/api.ts`.
+- Workflow renumerado 0/8..8/8: paso ESPN (3/8) con `actions/cache` para
+  los crudos (clave diaria `espn-crudos-v1-<día>` + restore-keys — el
+  disco del runner es efímero y sin cache quemaría el presupuesto
+  re-bajando ~140 scoreboards en cada corrida) y `--limite 200` para
+  tolerar la corrida fría; auditoría 8/8 IMPRIME la cobertura de
+  `stats_partido` SIN exigirla (fuente no oficial: regla del cron).
+- **Fix CI** (hotfix `240c4dd`): la CI backend se puso roja porque los
+  tests nuevos importan `pipeline.espn` → `pipeline.config`, que exigía
+  FOOTBALL_API_KEY AL IMPORTAR. Solución honesta: `exigir_token()` — el
+  fail-fast vive en la construcción de `FootballDataClient` (punto de
+  uso de la red), no en la importación; el matcher ESPN es offline y los
+  tests corren sin secretos, como todo el repo.
+
+**Verificación:** 63 pruebas verdes (13 nuevas ESPN con fixtures
+sintéticas + 10 de tarjetas), ruff limpio, `next build` web verde. `7649a5f` → CI backend FALLIDA (token al importar) → hotfix `240c4dd` →
+CI backend + web VERDE. Cobertura local (Postgres Docker del `.env`) tras
+completar los 49 pendientes del mapping: **337/337 jugados (674 filas) en
+las 5 ligas**. Humo TestClient contra esa BD: `/tarjetas?liga=PD` 200
+(calidad walk-forward O/U 2.5 = 57/70 = 81.4%, 3.5 = 48/70 = 68.6%; Getafe
+3.15/partido de cabeza; propensos con apariciones) y
+`/partido/564685/tarjetas` 200 con reales por jugador (Eyong 77' · Toljan
+80') y predicción λ 4.02 (over 2.5 = 76.5%).
+- DESCUBRIMIENTO de despliegue: el `.env` local apunta al Postgres
+  Docker (`localhost:5432`) — espejo de los datos de referencia, NO a
+  Neon → el backfill local NO puebla producción (Render leyó
+  `stats_partido` vacío: contratos correctos, cobertura 0). Ejecución:
+  dispatch MANUAL de data-refresh contra el DSN de los GitHub secrets
+  (`240c4dd`) — la corrida fría arrastra ~142 scoreboards + ~58 summaries
+  dentro del límite 200 → la cobertura convergirá en 2-3 crons.
+- Humo EN PRODUCCIÓN (tras la corrida manual VERDE): `/tarjetas?liga=PD`
+  → **90/90 jugados** (100%) con calidad walk-forward O/U 2.5 = 63/78 =
+  80.8% (MAE 1.69) y 20 equipos/15 propensos; PL 33/71 (en curso), el
+  resto converge en la corrida programada que seguía detrás
+  (`concurrency` los encadena). Cruz de fe: `/partido/564685/tarjetas`
+  en producción = λ 4.02 · over 2.5 = 76.5% — **idéntico al humo local
+  hasta el decimal**: el matcher reproduce local→producción.
+- Humo WEB: `/partido/564718` (próximo Rayo vs Elche) en Vercel → HTTP
+  200 con la sección Tarjetas renderizada completa (λ 5.03 · over 2.5 =
+  87.8% · 5 propensos por lado; contra la API de Render viva). Nota
+  honesta del formato: las páginas `/partido/{id}` de partidos JUGADOS
+  muestran «No hay predicciones guardadas» POR DISEÑO (la tabla
+  `prediccion` solo contiene próximos — Fase 13); el primer intento de
+  humo usó un id jugado (564685) y dibujó ese branch, no un defecto.
+
+**Lecciones de sesión:**
+- Auditoría de fuentes: verificar el robots.txt ANTES de mirar precio y
+  API; Understat murió por ese solo detalle.
+- Importar `pipeline.config` era tocar la gobernanza del token: el
+  fail-fast pertenece al punto de USO (construir el cliente HTTP), no a
+  la importación de módulos offline.
+- Estado local ≠ producción: el espejo Docker sirve para desarrollar,
+  pero cada dato nuevo DEBE pasar por la cadena productiva (cron/dispatch
+  con los secrets) — los backfills locales no pueblan Neon.
+- El estado del crudo ESPN vive en `actions/cache` (clave diaria), no en
+  el repo: los crudos NO se commitean; en local queda además el cache de
+  disco como copia dev.
+
+**Siguientes pasos:**
+1. Dejar converger la cobertura productiva (PL/SA/BL1/CL) en la corrida
+   programada ya en cola y los crons siguientes — vigilable con
+   `/tarjetas?liga=X` y la auditoría 8/8 en Actions (sin bloquear la
+   Fase 16: la ingesta es la misma cadena incremental).
+2. Fase 16 (tiros + cornes): `backend/app/tiros.py` + `backend/app/
+   cornes.py` (el ESQUEMA ya está ingestado) → endpoints ×4 → secciones
+   web → pruebas → commit → push → CI → humo → ritual Sesión 18.
+3. Higiene pendiente del dueño (sin bloqueo): password Neon, borrar
+   NEOM_API_KEY.
+
 
 
 
