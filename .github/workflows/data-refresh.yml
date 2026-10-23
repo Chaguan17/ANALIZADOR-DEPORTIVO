@@ -1,0 +1,90 @@
+# PIPELINE DE DATOS PROGRAMADO — Fase 12
+#
+# REFRESCO COMPLETO cada ~6 h: API de football-data.org → JSON crudos+transform
+# → Postgres (Neon en producción) → predicciones de los 3 modelos vivos
+# (baseline Poisson doble · Dixon-Coles · LightGBM) → evaluación walk-forward
+# acumulada en reales_vs_previsto. TODO idempotente (upserts por PK de la API
+# y UNIQUE (partido, modelo)): re-corre tomados los mismos datos → mismo estado.
+#
+# Secretos requeridos (Settings → Secrets and variables → Actions):
+#   FOOTBALL_API_KEY — clave del free tier de football-data.org (la del .env local)
+#   DATABASE_URL     — DSN de Neon en formato SQLAlchemy:
+#                      postgresql+psycopg://usuario:password@host/neondb?sslmode=require
+#
+# Todo corre con las MISMAS dependencias pinneadas que la CI y lo local
+# (python 3.14 + backend/requirements.txt) — un único modo de ejecutar.
+
+name: Data Refresh
+
+on:
+  schedule:
+    # cada ~6 h al minuto 17 (fuera de la congestión de runners en ":00")
+    # ojo: GitHub cron usa UTC → 00:17/06:17/12:17/18:17 UTC
+    - cron: "17 */6 * * *"
+  workflow_dispatch: {}   # botón "Run workflow" en Actions (prueba manual)
+
+permissions:
+  contents: read
+
+# Protección anti-solapamiento: solo UN refresco a la vez; si un cron cae
+# mientras otro corre, el nuevo espera (encola) en lugar de pelear por la BD.
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    name: API → carga → modelos → evaluación
+    runs-on: ubuntu-latest
+    timeout-minutes: 35   # la cadenas completa tarda ~15 min; margen por si la API responde lento
+
+    env:
+      FOOTBALL_API_KEY: ${{ secrets.FOOTBALL_API_KEY }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+
+      - name: Instalar dependencias (pins idénticos a CI y local)
+        run: pip install -r backend/requirements.txt
+
+      - name: 1/6 Ingesta football-data.org (raw + transform, pacing 10 req/min)
+        run: python -m pipeline --refresh
+
+      - name: 2/6 Carga idempotente a Postgres (local → Neon)
+        run: python -m backend.app.load
+
+      - name: 3/6 Baseline Poisson doble — predicciones vivas
+        run: python -m backend.app.modelo --todas --guardar
+
+      - name: 4/6 Dixon-Coles — evaluación + predicciones vivas
+        run: python -m backend.app.modelo_dc --todas --guardar --vivas
+
+      - name: 5/6 LightGBM — evaluación + predicciones vivas
+        run: python -m backend.app.modelo_lgbm --todas --guardar --vivas
+
+      - name: 6/6 Evaluación walk-forward acumulada del baseline
+        run: python -m backend.app.evaluacion --todas --guardar
+
+      - name: Auditoría final — conteos de la BD (el log queda en Actions)
+        run: |
+          python - <<'EOF'
+          import os
+
+          from sqlalchemy import create_engine, text
+
+          engine = create_engine(os.environ["DATABASE_URL"])
+          with engine.connect() as c:
+              conteos = {
+                  t: c.execute(text(f"SELECT count(*) FROM {t}")).scalar()
+                  for t in ("partidos", "prediccion", "reales_vs_previsto")
+              }
+          print("== RESUMEN BD tras el refresh ==")
+          print(conteos)
+          assert conteos["partidos"] > 0 and conteos["prediccion"] > 0
+          print("Refresh COMPLETO ✓")
+          EOF

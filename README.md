@@ -9,7 +9,7 @@ reales de la industria.
 
 [![CI backend](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-backend.yml/badge.svg)](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-backend.yml)
 [![CI web](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-web.yml/badge.svg)](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/ci-web.yml)
-<!-- Data Refresh (cron) llegará con la Fase 12 -->
+[![Data Refresh](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/data-refresh.yml/badge.svg)](https://github.com/Chaguan17/ANALIZADOR-DEPORTIVO/actions/workflows/data-refresh.yml)
 
 ## 🧱 Stack
 
