@@ -1,14 +1,17 @@
 import Link from "next/link";
 import { LIGAS, MODELOS } from "@/lib/formato";
 
-/** Chips de liga (links con query); mantiene el modelo elegido. */
-export function SelLiga({ activa, modelo }: { activa: string; modelo: string }) {
+/** Chips de liga (links con query); conserva el modelo si el llamador lo pasa. */
+export function SelLiga({ activa, modelo }: { activa: string; modelo?: string }) {
   return (
     <nav className="chips" aria-label="Liga">
       {LIGAS.map((l) => (
         <Link
           key={l.codigo}
-          href={{ pathname: "/", query: { liga: l.codigo, modelo } }}
+          href={{
+            pathname: "/",
+            query: modelo ? { liga: l.codigo, modelo } : { liga: l.codigo },
+          }}
           className={`chip${l.codigo === activa ? " chip-activa" : ""}`}
           aria-current={l.codigo === activa ? "true" : undefined}
         >

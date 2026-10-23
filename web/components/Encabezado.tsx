@@ -1,11 +1,6 @@
 import Link from "next/link";
-
-const ENLACES: Array<{ href: string; texto: string }> = [
-  { href: "/", texto: "Partidos" },
-  { href: "/torneo", texto: "Torneo" },
-  { href: "/ranking/PD", texto: "Rankings" },
-  { href: "/precision", texto: "Precisión" },
-];
+import { Suspense } from "react";
+import NavActiva, { NavLinks } from "./NavActiva";
 
 export default function Encabezado() {
   return (
@@ -17,13 +12,12 @@ export default function Encabezado() {
             Tres modelos compiten, una sola verdad: el resultado.
           </span>
         </Link>
-        <nav className="nav-principal" aria-label="Principal">
-          {ENLACES.map((e) => (
-            <Link key={e.href} href={e.href} className="nav-enlace">
-              {e.texto}
-            </Link>
-          ))}
-        </nav>
+        {/* El estado activo exige el pathname (hook de cliente); con
+            cacheComponents, el <Suspense> mantiene el shell prerenderizado
+            en las rutas dinámicas y hidrata la marca activa en el cliente. */}
+        <Suspense fallback={<NavLinks activa={null} />}>
+          <NavActiva />
+        </Suspense>
       </div>
     </header>
   );

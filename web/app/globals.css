@@ -91,6 +91,9 @@ body {
 .nav-enlace:hover {
   border-bottom-color: var(--tiza);
 }
+.nav-enlace.nav-activa {
+  border-bottom-color: var(--tiza);
+}
 
 .pizarra-pie {
   margin-top: 3.5rem;
@@ -506,6 +509,378 @@ body {
   color: var(--tinta-2);
   padding: 2rem 0;
   font-size: 0.9rem;
+}
+
+/* ══ NOCHE — rediseño editorial de la home ("Próximos partidos") ══════
+   Ámbito EXCLUSIVO de la home: el resto del sitio sigue en papel claro.
+   La paleta: la pizarra del vestuario a página completa + tiza fría.
+   La ÚNICA audacia de color es el oro del sello unánime: si las tres
+   voces firman el mismo resultado, "una sola verdad" brilla. Todo lo
+   demás (división, pendiente, navegación) vive en tiza.          */
+:root {
+  --noche: #0c1613;
+  --noche-tarjeta: #12201b;
+  --noche-linea: rgba(233, 238, 228, 0.16);
+  --noche-texto: #e9eee4;
+  --noche-texto-2: #9bb1a3;
+  --oro: #f0b429;
+  /* tonos de tiza para las barras 1|X|2: densidad, no color */
+  --t-b1: #e9eee4;
+  --t-bx: #8ba295;
+  --t-b2: #4c6a5d;
+}
+
+/* el lienzo entero se tiñe SOLO cuando la página es la noche */
+body:has(main .noche) {
+  background: var(--noche);
+  color: var(--noche-texto);
+}
+
+.noche {
+  background: var(--noche);
+  min-height: 100%;
+}
+
+/* foco visible en oro dentro de la noche */
+.noche a:focus-visible {
+  outline: 2px solid var(--oro);
+  outline-offset: 2px;
+}
+
+/* ── cartel ────────────────────────────────────────────────────────── */
+.n-hero {
+  margin: 0.6rem 0 1.5rem;
+}
+.n-kicker {
+  font-family: var(--font-num), Consolas, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.74rem;
+  color: var(--noche-texto-2);
+  margin: 0 0 0.4rem;
+}
+.n-cartel {
+  font-weight: 800;
+  font-stretch: 122%;
+  text-transform: uppercase;
+  font-size: clamp(2rem, 6vw, 3.2rem);
+  line-height: 0.98;
+  letter-spacing: 0.004em;
+  margin: 0 0 0.55rem;
+}
+.n-hero-sub {
+  color: var(--noche-texto-2);
+  font-size: 0.92rem;
+  max-width: 42rem;
+  margin: 0;
+}
+
+/* ── chips de liga en la noche (mismos enlaces, otra tinta) ────────── */
+.noche .chip {
+  background: transparent;
+  border-color: var(--noche-linea);
+  color: var(--noche-texto-2);
+}
+.noche .chip:hover {
+  border-color: var(--noche-texto-2);
+  color: var(--noche-texto);
+}
+.noche .chip-activa {
+  background: var(--noche-texto);
+  border-color: var(--noche-texto);
+  color: var(--noche);
+}
+
+/* ── leyenda ───────────────────────────────────────────────────────── */
+.n-leyenda {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  color: var(--noche-texto-2);
+  font-size: 0.8rem;
+  margin: 0 0 1.2rem;
+}
+.n-muestra {
+  display: inline-flex;
+  gap: 2px;
+  width: 2.6rem;
+  height: 0.55rem;
+  flex: none;
+}
+.n-muestra b {
+  flex: 1;
+  border-radius: 1px;
+}
+.n-seg-1 {
+  background: var(--t-b1);
+}
+.n-seg-x {
+  background: var(--t-bx);
+}
+.n-seg-2 {
+  background: var(--t-b2);
+}
+
+/* ── parrilla de boletines ─────────────────────────────────────────── */
+.n-parrilla {
+  display: grid;
+  gap: 0.9rem;
+  grid-template-columns: 1fr;
+}
+@media (min-width: 680px) {
+  .n-parrilla {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (min-width: 1080px) {
+  .n-parrilla {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+.n-boletin {
+  display: block;
+  background: var(--noche-tarjeta);
+  border: 1px solid var(--noche-linea);
+  border-radius: 6px;
+  padding: 0.85rem 1rem 0.95rem;
+  text-decoration: none;
+  color: inherit;
+  min-width: 0;
+  transition:
+    border-color 0.15s ease,
+    background-color 0.15s ease;
+}
+.n-boletin:hover {
+  border-color: rgba(233, 238, 228, 0.42);
+  background: #152420;
+}
+
+.n-boletin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 1rem;
+  color: var(--noche-texto-2);
+  border-bottom: 1px solid var(--noche-linea);
+  padding-bottom: 0.5rem;
+  margin: 0 0 0.7rem;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+}
+.n-boletin-matchup {
+  display: grid;
+  gap: 0.08rem;
+  font-weight: 800;
+  font-size: 1.14rem;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  margin: 0 0 0.85rem;
+}
+
+/* ── las tres voces: barras 1|X|2 comparables ──────────────────────── */
+.n-voces {
+  display: grid;
+  gap: 0.5rem;
+  margin-bottom: 0.9rem;
+}
+.n-voz {
+  display: grid;
+  grid-template-columns: 3.4rem 1fr;
+  gap: 0.6rem;
+  align-items: center;
+}
+.n-voz-sigla {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--noche-texto-2);
+}
+.n-voz .punto-voz {
+  width: 0.45rem;
+  height: 0.45rem;
+}
+.n-barra {
+  display: flex;
+  gap: 2px;
+  height: 0.55rem;
+  background: rgba(233, 238, 228, 0.07);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.n-barra b {
+  display: block;
+}
+.n-barra-vacia {
+  opacity: 0.55;
+}
+
+/* ── el sello: firmas 1/X/2 de las voces ───────────────────────────── */
+.n-sello {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding-top: 0.7rem;
+  border-top: 1px solid var(--noche-linea);
+}
+.n-sello-dividido {
+  border-top-style: dashed;
+  border-top-color: rgba(233, 238, 228, 0.38);
+}
+.n-firma {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.32rem;
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.8rem;
+  color: var(--noche-texto-2);
+  border: 1px solid var(--noche-linea);
+  border-radius: 4px;
+  padding: 0.18rem 0.5rem;
+}
+.n-firma .punto-voz {
+  align-self: center;
+  width: 0.4rem;
+  height: 0.4rem;
+}
+.n-firma-sigla {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.7rem;
+}
+.n-firma b {
+  font-weight: 700;
+  color: var(--noche-texto);
+}
+.n-firma-pct {
+  color: var(--noche-texto);
+}
+.n-firma-vacia {
+  opacity: 0.5;
+}
+/* LA audacia de color: unanimidad de las voces = oro */
+.n-sello-unanime .n-firma {
+  background: rgba(240, 180, 41, 0.1);
+  border-color: var(--oro);
+  color: var(--oro);
+}
+.n-sello-unanime .n-firma b,
+.n-sello-unanime .n-firma-pct {
+  color: var(--oro);
+}
+.n-sello-vacio {
+  color: var(--noche-texto-2);
+  font-style: italic;
+  font-size: 0.82rem;
+}
+
+/* ── estados: vacío y error ────────────────────────────────────────── */
+.n-estado {
+  background: var(--noche-tarjeta);
+  border: 1px solid var(--noche-linea);
+  border-left: 4px solid var(--noche-texto-2);
+  padding: 1.1rem 1.2rem;
+  max-width: 42rem;
+  margin-top: 1.6rem;
+}
+.n-estado-error {
+  border-left-color: #cd5b41;
+}
+.n-estado strong {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 1.02rem;
+}
+.n-estado-detalle {
+  color: var(--noche-texto-2);
+  font-size: 0.86rem;
+}
+.n-estado code {
+  font-family: var(--font-num), Consolas, monospace;
+  font-size: 0.8rem;
+  background: rgba(233, 238, 228, 0.08);
+  padding: 0.1rem 0.35rem;
+  border-radius: 3px;
+}
+.n-estado .num {
+  font-size: 0.78rem;
+}
+
+/* ── esqueletos (pulso apagable) ───────────────────────────────────── */
+.n-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.n-skel {
+  background: rgba(233, 238, 228, 0.07);
+  border-radius: 4px;
+  animation: n-pulso 1.15s ease-in-out infinite alternate;
+}
+@keyframes n-pulso {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0.4;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .n-skel {
+    animation: none;
+    opacity: 0.55;
+  }
+}
+.n-skel-titulo {
+  height: 2.7rem;
+  width: min(24rem, 82%);
+  margin: 0.7rem 0 0.55rem;
+}
+.n-skel-kicker {
+  height: 0.85rem;
+  width: 10rem;
+  margin-bottom: 1.3rem;
+}
+.n-chips-skel {
+  display: flex;
+  gap: 0.45rem;
+  margin-bottom: 1.15rem;
+}
+.n-skel-chip {
+  height: 1.5rem;
+  width: 5.6rem;
+  border-radius: 99px;
+}
+.n-skel-meta {
+  height: 0.72rem;
+  width: 6.5rem;
+  margin-bottom: 0.85rem;
+}
+.n-skel-equipo {
+  height: 1.05rem;
+  margin-bottom: 0.3rem;
+}
+.n-skel-barra {
+  height: 0.55rem;
+  margin-top: 0.8rem;
+}
+.n-firmas-skel {
+  display: flex;
+  gap: 0.4rem;
+  margin-top: 1.05rem;
+}
+.n-skel-firma {
+  height: 1.6rem;
+  flex: 0 0 4.6rem;
 }
 
 /* foco visible de teclado en toda la web */
